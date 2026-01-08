@@ -81,8 +81,13 @@ export async function createUser(
   }
 
   try {
+    // Construir URL base (Vercel provee VERCEL_URL automáticamente)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
     // Llamar al API route que usa Admin API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/admin/users`, {
+    const response = await fetch(`${baseUrl}/api/admin/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, role }),

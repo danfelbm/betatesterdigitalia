@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { getMaterials } from '@/actions/materials'
 import { getAnalysisStates } from '@/actions/analysis-states'
+import { getTagGroupsWithTags } from '@/actions/tag-groups'
 import { MaterialsTable } from '@/components/materials/materials-table'
 import { MaterialsFilters } from '@/components/materials/materials-filters'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
+import type { TagGroupWithTags } from '@/types/database'
 
 interface PageProps {
   searchParams: Promise<{
@@ -18,7 +20,7 @@ interface PageProps {
 export default async function MaterialsPage({ searchParams }: PageProps) {
   const params = await searchParams
 
-  const [materialsResult, statesResult] = await Promise.all([
+  const [materialsResult, statesResult, tagGroupsResult] = await Promise.all([
     getMaterials({
       category: params.category as any,
       format: params.format as any,
@@ -26,10 +28,12 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
       search: params.search,
     }),
     getAnalysisStates(),
+    getTagGroupsWithTags(),
   ])
 
   const materials = materialsResult.data || []
   const states = statesResult.data || []
+  const tagGroups = (tagGroupsResult.data || []) as TagGroupWithTags[]
 
   return (
     <div className="space-y-6">
@@ -50,7 +54,7 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
 
       <MaterialsFilters states={states} />
 
-      <MaterialsTable materials={materials} states={states} />
+      <MaterialsTable materials={materials} states={states} tagGroups={tagGroups} />
     </div>
   )
 }

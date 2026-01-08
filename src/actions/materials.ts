@@ -2,12 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { MaterialInsert, MaterialUpdate, ExpectedCategory, MaterialFormat } from '@/types/database'
+import type { MaterialInsert, MaterialUpdate, ExpectedCategory, MaterialFormat, Material, Tag } from '@/types/database'
 
 export async function getMaterials(filters?: {
   category?: ExpectedCategory
   format?: MaterialFormat
   stateId?: string
+  tagIds?: string[]  // Filtrar por etiquetas
   search?: string
 }) {
   const supabase = await createClient()
@@ -39,13 +40,64 @@ export async function getMaterials(filters?: {
     query = query.or(`description.ilike.%${filters.search}%,source.ilike.%${filters.search}%,url.ilike.%${filters.search}%`)
   }
 
-  const { data, error } = await query
+  const { data: materials, error } = await query
 
   if (error) {
     return { error: error.message, data: null }
   }
 
-  return { error: null, data }
+  if (!materials || materials.length === 0) {
+    return { error: null, data: [] }
+  }
+
+  const materialIds = materials.map(m => m.id)
+
+  // Obtener etiquetas para todos los materiales
+  const { data: materialTags } = await supabase
+    .from('material_tags')
+    .select('material_id, tag:tags(id, name, color, group_id, description, display_order, created_at)')
+    .in('material_id', materialIds)
+
+  // Obtener conteo de comentarios para todos los materiales
+  const { data: comments } = await supabase
+    .from('comments')
+    .select('material_id')
+    .in('material_id', materialIds)
+
+  // Mapear etiquetas por material
+  const tagsByMaterial = materialTags?.reduce((acc, mt: any) => {
+    if (!acc[mt.material_id]) {
+      acc[mt.material_id] = []
+    }
+    if (mt.tag) {
+      acc[mt.material_id].push(mt.tag as Tag)
+    }
+    return acc
+  }, {} as Record<string, Tag[]>) || {}
+
+  // Mapear conteo de comentarios por material
+  const commentsCounts = comments?.reduce((acc, c) => {
+    acc[c.material_id] = (acc[c.material_id] || 0) + 1
+    return acc
+  }, {} as Record<string, number>) || {}
+
+  // Enriquecer materiales con etiquetas y conteo
+  let enrichedMaterials = materials.map(material => ({
+    ...material,
+    tags: tagsByMaterial[material.id] || [],
+    comments_count: commentsCounts[material.id] || 0,
+  })) as Material[]
+
+  // Filtrar por etiquetas si se especifica
+  if (filters?.tagIds && filters.tagIds.length > 0) {
+    enrichedMaterials = enrichedMaterials.filter(material =>
+      filters.tagIds!.some(tagId =>
+        material.tags?.some(tag => tag.id === tagId)
+      )
+    )
+  }
+
+  return { error: null, data: enrichedMaterials }
 }
 
 export async function getMaterialById(id: string) {
@@ -56,7 +108,8 @@ export async function getMaterialById(id: string) {
     return { error: 'No autenticado', data: null }
   }
 
-  const { data, error } = await supabase
+  // Obtener material con estado
+  const { data: material, error } = await supabase
     .from('materials')
     .select('*, analysis_state:analysis_states(*)')
     .eq('id', id)
@@ -67,7 +120,29 @@ export async function getMaterialById(id: string) {
     return { error: error.message, data: null }
   }
 
-  return { error: null, data }
+  // Obtener etiquetas del material
+  const { data: materialTags } = await supabase
+    .from('material_tags')
+    .select('tag:tags(id, name, color, group_id, description, display_order, created_at)')
+    .eq('material_id', id)
+
+  const tags = materialTags
+    ?.map((mt: any) => mt.tag)
+    .filter(Boolean) as Tag[] || []
+
+  // Obtener conteo de comentarios
+  const { data: comments } = await supabase
+    .from('comments')
+    .select('id')
+    .eq('material_id', id)
+
+  const enrichedMaterial = {
+    ...material,
+    tags,
+    comments_count: comments?.length || 0,
+  }
+
+  return { error: null, data: enrichedMaterial as Material }
 }
 
 export async function createMaterial(material: MaterialInsert) {

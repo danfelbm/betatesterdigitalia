@@ -8,12 +8,14 @@ import {
   FileStack,
   Settings,
   ShieldCheck,
+  Tags,
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Materiales', href: '/materials', icon: FileStack },
   { name: 'Estados', href: '/settings/states', icon: Settings },
+  { name: 'Etiquetas', href: '/settings/tags', icon: Tags },
 ]
 
 export function Sidebar() {

@@ -4,14 +4,16 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { deleteMaterial } from '@/actions/materials'
 import { Badge } from '@/components/ui/badge'
-import { StateModal } from './state-modal'
+import { AnalysisModal } from './analysis-modal'
+import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
-import type { Material, AnalysisState } from '@/types/database'
+import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
 import { ExternalLink, Pencil, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick } from 'lucide-react'
 
 interface MaterialsTableProps {
   materials: Material[]
   states: AnalysisState[]
+  tagGroups: TagGroupWithTags[]
 }
 
 const formatIcons = {
@@ -20,7 +22,7 @@ const formatIcons = {
   video: Video,
 }
 
-export function MaterialsTable({ materials, states }: MaterialsTableProps) {
+export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
 
@@ -67,7 +69,8 @@ export function MaterialsTable({ materials, states }: MaterialsTableProps) {
                 )
                 const FormatIcon = formatIcons[material.format]
                 const state = getStateInfo(material)
-                const hasNotes = material.analysis_notes && material.analysis_notes.length > 0
+                const hasComments = (material.comments_count || 0) > 0
+                const hasTags = material.tags && material.tags.length > 0
 
                 return (
                   <tr key={material.id} className="hover:bg-muted/50">
@@ -102,15 +105,23 @@ export function MaterialsTable({ materials, states }: MaterialsTableProps) {
                           {state?.name || 'Sin estado'}
                         </Badge>
                         <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                        {hasNotes && (
-                          <MessageSquare className="h-3 w-3 text-blue-500" title="Tiene notas" />
+                        {hasComments && (
+                          <span className="flex items-center gap-0.5 text-blue-500" title={`${material.comments_count} comentario(s)`}>
+                            <MessageSquare className="h-3 w-3" />
+                            <span className="text-[10px]">{material.comments_count}</span>
+                          </span>
                         )}
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="max-w-[200px] truncate text-muted-foreground">
-                        {material.description || '-'}
-                      </p>
+                      <div className="max-w-[200px] space-y-1">
+                        <p className="truncate text-muted-foreground">
+                          {material.description || '-'}
+                        </p>
+                        {hasTags && (
+                          <TagChips tags={material.tags!} size="xs" maxVisible={2} />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -149,9 +160,10 @@ export function MaterialsTable({ materials, states }: MaterialsTableProps) {
       </div>
 
       {selectedMaterial && (
-        <StateModal
+        <AnalysisModal
           material={selectedMaterial}
           states={states}
+          tagGroups={tagGroups}
           open={!!selectedMaterial}
           onClose={() => setSelectedMaterial(null)}
         />

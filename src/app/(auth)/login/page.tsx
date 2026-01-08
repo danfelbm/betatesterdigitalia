@@ -45,7 +45,7 @@ export default function LoginPage() {
         <div className="flex justify-center mb-2">
           <ShieldCheck className="h-12 w-12 text-primary" />
         </div>
-        <CardTitle className="text-2xl">Botilito Marcadores</CardTitle>
+        <CardTitle className="text-2xl">Botilito Testers</CardTitle>
         <CardDescription>
           Ingresa a tu cuenta para gestionar el material de prueba
         </CardDescription>

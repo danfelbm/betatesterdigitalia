@@ -49,7 +49,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-8 w-8 text-primary" />
-            <span className="text-lg font-semibold">Botilito</span>
+            <span className="text-lg font-semibold">Botilito Testers</span>
           </div>
           <button
             type="button"

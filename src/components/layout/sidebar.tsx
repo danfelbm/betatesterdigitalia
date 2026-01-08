@@ -41,7 +41,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-background px-6 pb-4">
         <div className="flex h-16 shrink-0 items-center gap-2">
           <ShieldCheck className="h-8 w-8 text-primary" />
-          <span className="text-lg font-semibold">Botilito</span>
+          <span className="text-lg font-semibold">Botilito Testers</span>
         </div>
         <nav className="flex flex-1 flex-col">
           <ul role="list" className="flex flex-1 flex-col gap-y-7">

@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Botilito Marcadores - Gestión de Material AMI',
+  title: 'Botilito Testers - Gestión de Material AMI',
   description: 'Plataforma para gestionar material de prueba para detección de desinformación',
 }
 

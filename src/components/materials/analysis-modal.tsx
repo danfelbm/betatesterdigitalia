@@ -35,6 +35,10 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
   const previousStateIdRef = useRef<string | null>(null)
   // Flag para saber si efectivamente se cambió el estado
   const stateWasChangedRef = useRef<boolean>(false)
+  // Flag para evitar múltiples inicializaciones del modal
+  const isInitializedRef = useRef<boolean>(false)
+  // Guardar el material.id para detectar cambios reales
+  const currentMaterialIdRef = useRef<string | null>(null)
 
   // Encontrar estados especiales por nombre
   const inProgressState = useMemo(() =>
@@ -50,16 +54,37 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
 
   // Al abrir el modal: cargar datos y cambiar estado a "En progreso"
   useEffect(() => {
-    if (open) {
+    // Solo inicializar si:
+    // 1. El modal está abierto
+    // 2. No hemos inicializado aún O el material cambió
+    const shouldInitialize = open && (
+      !isInitializedRef.current ||
+      currentMaterialIdRef.current !== material.id
+    )
+
+    if (shouldInitialize) {
+      // Marcar como inicializado ANTES de cualquier otra cosa
+      isInitializedRef.current = true
+      currentMaterialIdRef.current = material.id
+
       setIsLoadingData(true)
       setWasSaved(false)
       stateWasChangedRef.current = false
+      previousStateIdRef.current = null
+
+      // Buscar el estado "En progreso" localmente (no depender del useMemo)
+      const inProgressStateLocal = states.find(s => s.name.toLowerCase() === 'en progreso')
 
       // Cargar datos y cambiar estado a "En progreso" en paralelo
       Promise.all([
         getAnalysisModalData(material.id),
         setMaterialInProgress(material.id)
       ]).then(([dataResult, progressResult]) => {
+        // Verificar que el modal sigue abierto y es el mismo material
+        if (!isInitializedRef.current || currentMaterialIdRef.current !== material.id) {
+          return // El modal se cerró o cambió de material, ignorar
+        }
+
         if (dataResult.data) {
           setComments(dataResult.data.comments)
           setSelectedTagIds(new Set(dataResult.data.materialTagIds))
@@ -72,8 +97,8 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
         }
 
         // Inicializar el selector con "En progreso"
-        if (inProgressState) {
-          setSelectedStateId(inProgressState.id)
+        if (inProgressStateLocal) {
+          setSelectedStateId(inProgressStateLocal.id)
         }
 
         setIsLoadingData(false)
@@ -83,7 +108,13 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
       setNewComment('')
       setHasInteracted(false)
     }
-  }, [open, material.id, inProgressState])
+
+    // Cuando el modal se cierra, resetear el flag de inicialización
+    if (!open) {
+      isInitializedRef.current = false
+      currentMaterialIdRef.current = null
+    }
+  }, [open, material.id, states])
 
   // Cuando el usuario escribe, preseleccionar "Analizado"
   useEffect(() => {

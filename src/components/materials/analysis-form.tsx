@@ -23,7 +23,8 @@ interface AnalysisFormProps {
   states: AnalysisState[]
   tagGroups: TagGroupWithTags[]
   currentUserEmail: string
-  pendingStateId: string | null
+  previousStateId: string | null // Estado ANTERIOR del material (antes de "En progreso")
+  isAdmin?: boolean
 }
 
 export function AnalysisForm({
@@ -33,7 +34,8 @@ export function AnalysisForm({
   states,
   tagGroups,
   currentUserEmail,
-  pendingStateId,
+  previousStateId,
+  isAdmin = false,
 }: AnalysisFormProps) {
   const router = useRouter()
   const [newComment, setNewComment] = useState('')
@@ -74,12 +76,12 @@ export function AnalysisForm({
 
     // Handler para cierre de pestaña/navegador
     const handleBeforeUnload = () => {
-      if (!wasSavedRef.current && pendingStateId) {
+      if (!wasSavedRef.current) {
         navigator.sendBeacon(
           '/api/materials/revert-state',
           JSON.stringify({
             materialId: materialIdRef.current,
-            previousStateId: pendingStateId,
+            previousStateId: previousStateId, // Volver al estado ANTERIOR, no a "Pendiente"
           })
         )
       }
@@ -92,8 +94,8 @@ export function AnalysisForm({
       unlockMaterial()
 
       // Al desmontar (navegación), revertir si no se guardó
-      if (!wasSavedRef.current && pendingStateId) {
-        revertMaterialState(materialIdRef.current, pendingStateId)
+      if (!wasSavedRef.current) {
+        revertMaterialState(materialIdRef.current, previousStateId)
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -217,11 +219,13 @@ export function AnalysisForm({
               onChange={(e) => setSelectedStateId(e.target.value)}
             >
               <option value="">Seleccionar estado</option>
-              {states.map((state) => (
-                <option key={state.id} value={state.id}>
-                  {state.name}
-                </option>
-              ))}
+              {states
+                .filter((state) => isAdmin || state.name.toLowerCase() !== 'en progreso')
+                .map((state) => (
+                  <option key={state.id} value={state.id}>
+                    {state.name}
+                  </option>
+                ))}
             </Select>
             {currentVisualState && (
               <div className="flex items-center gap-2 text-sm">

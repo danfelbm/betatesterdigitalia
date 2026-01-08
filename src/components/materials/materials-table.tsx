@@ -10,7 +10,7 @@ import { EXPECTED_CATEGORIES } from '@/lib/constants'
 import { useMaterialsRealtime } from '@/hooks/use-materials-realtime'
 import { useMaterialLocks } from '@/hooks/use-material-locks'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye, Wifi, WifiOff, Loader2, Lock } from 'lucide-react'
+import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, Eye, Wifi, WifiOff, Loader2, Lock, Send } from 'lucide-react'
 
 interface MaterialsTableProps {
   initialMaterials: Material[]
@@ -26,7 +26,7 @@ const formatIcons = {
   video: Video,
 }
 
-export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = false, currentUserEmail }: MaterialsTableProps) {
+export function MaterialsTable({ initialMaterials, states, isAdmin = false, currentUserEmail }: MaterialsTableProps) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -44,15 +44,18 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
 
   const isConnected = isRealtimeConnected && isPresenceConnected
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation() // Evitar que el clic propague al row
     if (!confirm('¿Estás seguro de eliminar este material?')) return
     setDeletingId(id)
     await deleteMaterial(id)
     setDeletingId(null)
   }
 
-  const handleAnalyze = (materialId: string) => {
-    router.push(`/materials/${materialId}/analyze`)
+  const handleRowClick = (materialId: string, isLocked: boolean) => {
+    if (!isLocked) {
+      router.push(`/materials/${materialId}/analyze`)
+    }
   }
 
   const getStateInfo = (material: Material) => {
@@ -97,6 +100,7 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                 <th className="px-4 py-3 text-left font-medium">Fuente</th>
                 <th className="px-4 py-3 text-left font-medium">Categoría</th>
                 <th className="px-4 py-3 text-left font-medium">Descripción</th>
+                <th className="px-4 py-3 text-left font-medium">Estado</th>
                 <th className="px-4 py-3 text-right font-medium">Acciones</th>
               </tr>
             </thead>
@@ -112,19 +116,19 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
 
                 // Sistema de locks basado en Presence
                 const locker = getLocker(material.id)
-                const isLockedByOther = locker && locker.user_email !== currentUserEmail
                 const isLockedByMe = locker && locker.user_email === currentUserEmail
                 const isLocked = !!locker // Cualquier lock (mío o de otro)
 
                 return (
                   <tr
                     key={material.id}
+                    onClick={() => handleRowClick(material.id, isLocked)}
                     className={`${
                       isLocked
                         ? isLockedByMe
-                          ? 'bg-green-100/70 dark:bg-green-950/40 opacity-60 pointer-events-none select-none'
-                          : 'bg-muted/30 opacity-50 pointer-events-none select-none'
-                        : 'hover:bg-muted/50'
+                          ? 'bg-green-100/70 dark:bg-green-950/40 opacity-60 cursor-not-allowed'
+                          : 'bg-muted/30 opacity-50 cursor-not-allowed'
+                        : 'hover:bg-muted/50 cursor-pointer'
                     }`}
                   >
                     <td className="px-4 py-3">
@@ -157,7 +161,7 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center gap-2">
                         {/* Indicador de lock */}
                         {isLocked && locker && (
                           <div className={`flex items-center gap-1.5 ${isLockedByMe ? 'text-green-600' : 'text-muted-foreground'}`}>
@@ -166,74 +170,57 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                             ) : (
                               <Lock className="h-3.5 w-3.5" />
                             )}
-                            <span className="text-xs max-w-[120px] truncate" title={locker.user_email}>
+                            <span className="text-xs max-w-[80px] truncate" title={locker.user_email}>
                               {isLockedByMe ? 'Tú' : locker.user_email.split('@')[0]}
                             </span>
                           </div>
                         )}
 
-                        {/* Estado con botón de analizar - solo visible si NO está bloqueado */}
-                        {!isLocked && (
-                          <button
-                            onClick={() => handleAnalyze(material.id)}
-                            className="group flex items-center gap-1.5 hover:opacity-80 cursor-pointer"
-                            title="Analizar material"
-                          >
-                            <Badge
-                              color={state?.color}
-                              className="cursor-pointer"
-                            >
-                              {state?.name || 'Sin estado'}
-                            </Badge>
-                            {isLockedByMe ? (
-                              <Loader2 className="h-3.5 w-3.5 text-green-500 animate-spin" />
-                            ) : (
-                              <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                            )}
-                            {hasComments && (
-                              <span className="flex items-center gap-0.5 text-blue-500" title={`${material.comments_count} comentario(s)`}>
-                                <MessageSquare className="h-3 w-3" />
-                                <span className="text-[10px]">{material.comments_count}</span>
-                              </span>
-                            )}
-                          </button>
+                        <Badge color={state?.color}>
+                          {state?.name || 'Sin estado'}
+                        </Badge>
+
+                        {hasComments && (
+                          <span className="flex items-center gap-0.5 text-blue-500" title={`${material.comments_count} comentario(s)`}>
+                            <MessageSquare className="h-3 w-3" />
+                            <span className="text-[10px]">{material.comments_count}</span>
+                          </span>
                         )}
-
-                        {/* Badge de estado cuando está bloqueado (sin acción) */}
-                        {isLocked && (
-                          <Badge color={state?.color}>
-                            {state?.name || 'Sin estado'}
-                          </Badge>
-                        )}
-
-                        {/* Separador */}
-                        <span className="h-4 w-px bg-border" />
-
-                        {/* Otras acciones - deshabilitadas si está bloqueado */}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
+                          title="Analizar y enviar reporte"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          <span>Enviar reporte</span>
+                        </button>
                         <Link
                           href={`/materials/${material.id}/show`}
-                          className={`p-2 rounded-md ${isLockedByOther ? '' : 'hover:bg-muted'}`}
-                          title="Ver detalles"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-muted transition-colors"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>Ver</span>
                         </Link>
                         <a
                           href={material.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`p-2 rounded-md ${isLockedByOther ? '' : 'hover:bg-muted'}`}
-                          title="Abrir URL"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-muted transition-colors"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span>Abrir</span>
                         </a>
                         {isAdmin && (
                           <button
-                            onClick={() => handleDelete(material.id)}
-                            disabled={deletingId === material.id || !!isLockedByOther}
-                            className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-md disabled:opacity-50"
+                            onClick={(e) => handleDelete(e, material.id)}
+                            disabled={deletingId === material.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
                             title="Eliminar"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>

@@ -39,8 +39,9 @@ export default async function AnalyzeMaterialPage({ params }: PageProps) {
   const states = statesResult.data || []
   const tagGroups = (tagGroupsResult.data || []) as TagGroupWithTags[]
 
-  // Obtener el ID del estado "Pendiente" para revertir al cancelar
-  const pendingState = states.find(s => s.name.toLowerCase() === 'pendiente')
+  // Guardar el estado ACTUAL del material para revertir si se cancela
+  // Este es el estado que tenía ANTES de entrar a esta página
+  const previousStateId = material.analysis_state_id
 
   return (
     <AnalysisForm
@@ -50,7 +51,8 @@ export default async function AnalyzeMaterialPage({ params }: PageProps) {
       states={states}
       tagGroups={tagGroups}
       currentUserEmail={user.email || ''}
-      pendingStateId={pendingState?.id || null}
+      previousStateId={previousStateId}
+      isAdmin={user.role === 'admin'}
     />
   )
 }

@@ -107,6 +107,51 @@ export async function createComment(comment: CommentInsert) {
 }
 
 /**
+ * Elimina un comentario (solo admin)
+ */
+export async function deleteComment(commentId: string) {
+  const supabase = await createClient()
+
+  let user
+  try {
+    user = await requireAuth()
+  } catch {
+    return { error: 'No autenticado' }
+  }
+
+  // Verificar que es admin
+  if (user.role !== 'admin') {
+    return { error: 'Solo los administradores pueden eliminar comentarios' }
+  }
+
+  // Obtener el material_id antes de borrar para revalidar
+  const { data: comment } = await supabase
+    .from('comments')
+    .select('material_id')
+    .eq('id', commentId)
+    .single()
+
+  if (!comment) {
+    return { error: 'Comentario no encontrado' }
+  }
+
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/materials')
+  revalidatePath(`/materials/${comment.material_id}`)
+  revalidatePath(`/materials/${comment.material_id}/show`)
+  revalidatePath(`/materials/${comment.material_id}/analyze`)
+  return { error: null }
+}
+
+/**
  * Obtiene el conteo de comentarios para múltiples materiales
  * Útil para la tabla de materiales
  */

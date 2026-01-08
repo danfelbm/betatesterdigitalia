@@ -181,7 +181,7 @@ export function AnalysisForm({
             <CardTitle className="text-base">Historial de Comentarios</CardTitle>
           </CardHeader>
           <CardContent>
-            <CommentHistory comments={comments} maxHeight="200px" />
+            <CommentHistory comments={comments} maxHeight="200px" isAdmin={isAdmin} />
           </CardContent>
         </Card>
       )}

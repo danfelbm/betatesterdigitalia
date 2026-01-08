@@ -1,10 +1,11 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getMaterialById } from '@/actions/materials'
 import { getComments } from '@/actions/comments'
 import { getMaterialTags } from '@/actions/analysis'
 import { getTagGroupsWithTags } from '@/actions/tag-groups'
 import { getAnalysisStates } from '@/actions/analysis-states'
+import { getCurrentUser } from '@/lib/auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +38,11 @@ const formatIcons = {
 
 export default async function MaterialShowPage({ params }: PageProps) {
   const { id } = await params
+  const user = await getCurrentUser()
+
+  if (!user) {
+    redirect('/login')
+  }
 
   const [materialResult, commentsResult, tagsResult, statesResult, tagGroupsResult] = await Promise.all([
     getMaterialById(id),
@@ -45,6 +51,8 @@ export default async function MaterialShowPage({ params }: PageProps) {
     getAnalysisStates(),
     getTagGroupsWithTags(),
   ])
+
+  const isAdmin = user.role === 'admin'
 
   if (!materialResult.data) {
     notFound()
@@ -174,7 +182,7 @@ export default async function MaterialShowPage({ params }: PageProps) {
             </CardHeader>
             <CardContent>
               {comments.length > 0 ? (
-                <CommentHistory comments={comments} maxHeight="none" />
+                <CommentHistory comments={comments} maxHeight="none" isAdmin={isAdmin} />
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   No hay comentarios de análisis aún.

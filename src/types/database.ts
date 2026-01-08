@@ -1,3 +1,20 @@
+// ============================================
+// ROLES DE USUARIO
+// ============================================
+
+export type UserRole = 'admin' | 'regular'
+
+export interface Profile {
+  id: string
+  role: UserRole
+  created_at: string
+  updated_at: string
+}
+
+// ============================================
+// TIPOS BÁSICOS
+// ============================================
+
 export type MaterialFormat = 'texto' | 'imagen' | 'video'
 
 export type ExpectedCategory =
@@ -195,6 +212,11 @@ export interface AnalysisStateUpdate {
 export interface Database {
   public: {
     Tables: {
+      profiles: {
+        Row: Profile
+        Insert: { id: string; role?: UserRole }
+        Update: { role?: UserRole }
+      }
       materials: {
         Row: Material
         Insert: MaterialInsert & { user_id: string }
@@ -227,6 +249,7 @@ export interface Database {
       }
     }
     Enums: {
+      user_role: UserRole
       material_format: MaterialFormat
       expected_category: ExpectedCategory
     }

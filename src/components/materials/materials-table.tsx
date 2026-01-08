@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge'
 import { AnalysisModal } from './analysis-modal'
 import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
+import { useMaterialsRealtime } from '@/hooks/use-materials-realtime'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye } from 'lucide-react'
+import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye, Wifi, WifiOff } from 'lucide-react'
 
 interface MaterialsTableProps {
-  materials: Material[]
+  initialMaterials: Material[]
   states: AnalysisState[]
   tagGroups: TagGroupWithTags[]
 }
@@ -22,9 +23,15 @@ const formatIcons = {
   video: Video,
 }
 
-export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableProps) {
+export function MaterialsTable({ initialMaterials, states, tagGroups }: MaterialsTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
+
+  // Hook para actualización en tiempo real
+  const { materials, isConnected } = useMaterialsRealtime({
+    initialMaterials,
+    states,
+  })
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Estás seguro de eliminar este material?')) return
@@ -49,6 +56,23 @@ export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableP
 
   return (
     <>
+      {/* Indicador de conexión en tiempo real */}
+      <div className="flex items-center justify-end mb-2">
+        <div
+          className={`flex items-center gap-1.5 text-xs ${
+            isConnected ? 'text-green-600' : 'text-muted-foreground'
+          }`}
+          title={isConnected ? 'Conectado - actualizaciones en tiempo real' : 'Desconectado'}
+        >
+          {isConnected ? (
+            <Wifi className="h-3 w-3" />
+          ) : (
+            <WifiOff className="h-3 w-3" />
+          )}
+          <span>{isConnected ? 'En vivo' : 'Sin conexión'}</span>
+        </div>
+      </div>
+
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

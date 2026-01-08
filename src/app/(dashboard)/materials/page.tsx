@@ -54,7 +54,7 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
 
       <MaterialsFilters states={states} />
 
-      <MaterialsTable materials={materials} states={states} tagGroups={tagGroups} />
+      <MaterialsTable initialMaterials={materials} states={states} tagGroups={tagGroups} />
     </div>
   )
 }

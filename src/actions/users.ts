@@ -2,11 +2,21 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/auth'
 import type { Profile, UserRole } from '@/types/database'
 
 interface UserWithEmail extends Profile {
   email: string
+}
+
+// Cliente admin para operaciones que requieren service_role
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 }
 
 /**
@@ -37,11 +47,7 @@ export async function getUsers(): Promise<{
     return { error: 'No autorizado', data: null }
   }
 
-  // Obtener perfiles con emails de auth.users
-  // Nota: Necesitamos hacer un JOIN con auth.users, pero desde el cliente
-  // no podemos acceder a esa tabla directamente. Usamos una vista o función RPC.
-
-  // Opción simple: obtener perfiles y luego los emails
+  // Obtener perfiles
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('*')
@@ -51,26 +57,26 @@ export async function getUsers(): Promise<{
     return { error: profilesError.message, data: null }
   }
 
-  // Para obtener emails, necesitamos una función RPC o vista en Supabase
-  // Por ahora, retornamos los perfiles sin email (se mostrará el ID)
+  // Placeholder para emails - necesita RPC en Supabase
   const usersWithEmail: UserWithEmail[] = (profiles || []).map(p => ({
     ...p,
-    email: `Usuario ${p.id.slice(0, 8)}...`, // Placeholder - necesita RPC
+    email: `Usuario ${p.id.slice(0, 8)}...`,
   }))
 
   return { error: null, data: usersWithEmail }
 }
 
 /**
- * Crea un nuevo usuario usando Admin API
+ * Crea un nuevo usuario usando Admin API directamente
  * Solo admin puede crear usuarios
- * Usa un API route para no exponer service_role key
  */
 export async function createUser(
   email: string,
   password: string,
   role: UserRole = 'regular'
 ): Promise<{ error: string | null; data: { id: string } | null }> {
+  const supabase = await createClient()
+
   // Validaciones básicas
   if (!email || !email.includes('@')) {
     return { error: 'Email inválido', data: null }
@@ -80,32 +86,47 @@ export async function createUser(
     return { error: 'La contraseña debe tener al menos 6 caracteres', data: null }
   }
 
+  // Verificar que el usuario actual es admin
+  let user
   try {
-    // Construir URL base (Vercel provee VERCEL_URL automáticamente)
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-    // Llamar al API route que usa Admin API
-    const response = await fetch(`${baseUrl}/api/admin/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, role }),
-    })
-
-    const result = await response.json()
-
-    if (!response.ok) {
-      return { error: result.error || 'Error al crear usuario', data: null }
-    }
-
-    revalidatePath('/settings/users')
-    return { error: null, data: { id: result.userId } }
-
-  } catch (error) {
-    console.error('Error creating user:', error)
-    return { error: 'Error de conexión', data: null }
+    user = await requireAuth()
+  } catch {
+    return { error: 'No autenticado', data: null }
   }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { error: 'No autorizado', data: null }
+  }
+
+  // Usar cliente admin para crear usuario
+  const adminClient = getAdminClient()
+
+  const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+
+  if (createError) {
+    return { error: createError.message, data: null }
+  }
+
+  // Actualizar rol si no es 'regular'
+  if (role && role !== 'regular' && newUser.user) {
+    await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', newUser.user.id)
+  }
+
+  revalidatePath('/settings/users')
+  return { error: null, data: { id: newUser.user?.id || '' } }
 }
 
 /**
@@ -157,7 +178,6 @@ export async function updateUserRole(
 /**
  * Elimina un usuario completamente (profiles + auth.users)
  * Solo admin puede eliminar usuarios
- * Usa una función RPC para tener permisos de eliminar de auth.users
  */
 export async function deleteUser(userId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -185,25 +205,15 @@ export async function deleteUser(userId: string): Promise<{ error: string | null
     return { error: 'No puedes eliminarte a ti mismo' }
   }
 
-  // Usar función RPC para eliminar completamente (profiles + auth.users)
-  const { error: deleteError } = await supabase
-    .rpc('delete_user_completely', { user_id: userId })
+  // Usar cliente admin para eliminar usuario de auth.users
+  const adminClient = getAdminClient()
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
 
   if (deleteError) {
-    // Si la función RPC no existe, intentar solo con profiles
-    if (deleteError.message.includes('does not exist')) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId)
-
-      if (profileError) {
-        return { error: profileError.message }
-      }
-      return { error: null }
-    }
     return { error: deleteError.message }
   }
+
+  // El profile se elimina automáticamente por ON DELETE CASCADE o trigger
 
   revalidatePath('/settings/users')
   return { error: null }

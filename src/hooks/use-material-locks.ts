@@ -36,8 +36,6 @@ export function useMaterialLocks(currentUserEmail: string): UseMaterialLocksRetu
   useEffect(() => {
     if (!currentUserEmail) return
 
-    console.log('[Presence] Iniciando conexión para:', currentUserEmail)
-
     const channel = supabase.channel('material-locks', {
       config: {
         presence: {
@@ -50,8 +48,6 @@ export function useMaterialLocks(currentUserEmail: string): UseMaterialLocksRetu
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState<LockInfo>()
         const newLocks = new Map<string, LockInfo>()
-
-        console.log('[Presence] Sync - estado actual:', presenceState)
 
         // Convertir el estado de presencia a un Map de locks por material_id
         Object.values(presenceState).forEach((presences) => {
@@ -67,28 +63,21 @@ export function useMaterialLocks(currentUserEmail: string): UseMaterialLocksRetu
           })
         })
 
-        console.log('[Presence] Locks actualizados:', Array.from(newLocks.entries()))
         setLockedMaterials(newLocks)
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('[Presence] Join:', key, newPresences)
+      .on('presence', { event: 'join' }, () => {
+        // Lock añadido - sync se encarga de actualizar el estado
       })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('[Presence] Leave:', key, leftPresences)
+      .on('presence', { event: 'leave' }, () => {
+        // Lock liberado - sync se encarga de actualizar el estado
       })
-      .subscribe(async (status) => {
-        console.log('[Presence] Estado de suscripción:', status)
-        if (status === 'SUBSCRIBED') {
-          setIsConnected(true)
-        } else {
-          setIsConnected(false)
-        }
+      .subscribe((status) => {
+        setIsConnected(status === 'SUBSCRIBED')
       })
 
     channelRef.current = channel
 
     return () => {
-      console.log('[Presence] Limpiando canal')
       channel.unsubscribe()
       channelRef.current = null
     }
@@ -97,10 +86,7 @@ export function useMaterialLocks(currentUserEmail: string): UseMaterialLocksRetu
   const lockMaterial = useCallback(
     (materialId: string) => {
       const channel = channelRef.current
-      if (!channel || !currentUserEmail) {
-        console.warn('[Presence] No se puede lockear: canal no conectado')
-        return
-      }
+      if (!channel || !currentUserEmail) return
 
       const lockInfo: LockInfo = {
         material_id: materialId,
@@ -108,10 +94,7 @@ export function useMaterialLocks(currentUserEmail: string): UseMaterialLocksRetu
         locked_at: new Date().toISOString(),
       }
 
-      console.log('[Presence] Intentando bloquear material:', materialId)
-      channel.track(lockInfo).then(() => {
-        console.log('[Presence] Material bloqueado exitosamente:', materialId)
-      }).catch((err) => {
+      channel.track(lockInfo).catch((err) => {
         console.error('[Presence] Error al bloquear:', err)
       })
 
@@ -122,15 +105,9 @@ export function useMaterialLocks(currentUserEmail: string): UseMaterialLocksRetu
 
   const unlockMaterial = useCallback(() => {
     const channel = channelRef.current
-    if (!channel) {
-      console.warn('[Presence] No se puede desbloquear: canal no conectado')
-      return
-    }
+    if (!channel) return
 
-    console.log('[Presence] Intentando desbloquear material:', currentLockRef.current)
-    channel.untrack().then(() => {
-      console.log('[Presence] Material desbloqueado exitosamente')
-    }).catch((err) => {
+    channel.untrack().catch((err) => {
       console.error('[Presence] Error al desbloquear:', err)
     })
 

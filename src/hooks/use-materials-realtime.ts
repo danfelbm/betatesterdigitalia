@@ -58,14 +58,11 @@ export function useMaterialsRealtime({ initialMaterials, states }: UseMaterialsR
 
           setMaterials(prev => prev.map(material => {
             if (material.id === updatedRow.id) {
-              // Actualizar el material con los nuevos datos
               return {
                 ...material,
                 analysis_state_id: updatedRow.analysis_state_id,
                 analysis_state: findState(updatedRow.analysis_state_id),
                 updated_at: updatedRow.updated_at,
-                // Mantener tags y comments_count del estado anterior
-                // ya que no vienen en el payload de Realtime
               }
             }
             return material
@@ -82,7 +79,6 @@ export function useMaterialsRealtime({ initialMaterials, states }: UseMaterialsR
         (payload: RealtimePostgresChangesPayload<MaterialRow>) => {
           const newRow = payload.new as MaterialRow
 
-          // Agregar el nuevo material al inicio de la lista
           const newMaterial: Material = {
             id: newRow.id,
             url: newRow.url,
@@ -124,7 +120,6 @@ export function useMaterialsRealtime({ initialMaterials, states }: UseMaterialsR
         setIsConnected(status === 'SUBSCRIBED')
       })
 
-    // Cleanup: desuscribirse al desmontar
     return () => {
       supabase.removeChannel(channel)
     }

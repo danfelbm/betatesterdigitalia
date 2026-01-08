@@ -5,6 +5,7 @@ import { getComments } from '@/actions/comments'
 import { getMaterialTags } from '@/actions/analysis'
 import { getTagGroupsWithTags } from '@/actions/tag-groups'
 import { getAnalysisStates } from '@/actions/analysis-states'
+import { getCurrentUser } from '@/lib/auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +38,7 @@ const formatIcons = {
 
 export default async function MaterialShowPage({ params }: PageProps) {
   const { id } = await params
+  const user = await getCurrentUser()
 
   const [materialResult, commentsResult, tagsResult, statesResult, tagGroupsResult] = await Promise.all([
     getMaterialById(id),
@@ -108,6 +110,7 @@ export default async function MaterialShowPage({ params }: PageProps) {
             material={material as Material}
             states={states}
             tagGroups={tagGroups}
+            currentUserEmail={user?.email || ''}
           />
         </div>
       </div>

@@ -14,9 +14,8 @@ import type {
 } from '@/types/database'
 
 /**
- * Actualiza el estado del material a "En progreso" al abrir el modal
- * Retorna el ID del estado anterior para poder revertir si se cancela
- * Todos los usuarios autenticados pueden cambiar estados
+ * Cambia el estado del material a "En progreso" en la BD.
+ * Retorna el ID del estado anterior para poder revertir.
  */
 export async function setMaterialInProgress(
   materialId: string
@@ -55,7 +54,7 @@ export async function setMaterialInProgress(
 
   const previousStateId = materialResult.data.analysis_state_id
 
-  // Si ya está en progreso, no hacer nada
+  // Si ya está en progreso, solo retornar el estado anterior
   if (previousStateId === inProgressState.id) {
     return { error: null, previousStateId }
   }
@@ -73,13 +72,13 @@ export async function setMaterialInProgress(
     return { error: updateError.message, previousStateId: null }
   }
 
-  revalidatePath('/materials')
+  // NO revalidamos aquí - Realtime se encargará de notificar
   return { error: null, previousStateId }
 }
 
 /**
- * Revierte el estado del material al estado anterior (si se cancela el modal sin cambios)
- * Todos los usuarios autenticados pueden revertir estados
+ * Revierte el estado del material al estado anterior.
+ * Se usa cuando se cancela el modal sin guardar.
  */
 export async function revertMaterialState(
   materialId: string,
@@ -105,7 +104,7 @@ export async function revertMaterialState(
     return { error: updateError.message }
   }
 
-  revalidatePath('/materials')
+  // NO revalidamos aquí - Realtime se encargará de notificar
   return { error: null }
 }
 

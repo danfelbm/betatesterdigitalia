@@ -64,6 +64,7 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
         states={states}
         tagGroups={tagGroups}
         isAdmin={isAdmin}
+        currentUserEmail={user?.email || ''}
       />
     </div>
   )

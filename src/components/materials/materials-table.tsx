@@ -8,14 +8,16 @@ import { AnalysisModal } from './analysis-modal'
 import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
 import { useMaterialsRealtime } from '@/hooks/use-materials-realtime'
+import { useMaterialLocks } from '@/hooks/use-material-locks'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye, Wifi, WifiOff, Loader2, Lock } from 'lucide-react'
 
 interface MaterialsTableProps {
   initialMaterials: Material[]
   states: AnalysisState[]
   tagGroups: TagGroupWithTags[]
   isAdmin?: boolean
+  currentUserEmail: string
 }
 
 const formatIcons = {
@@ -24,15 +26,25 @@ const formatIcons = {
   video: Video,
 }
 
-export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = false }: MaterialsTableProps) {
+export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = false, currentUserEmail }: MaterialsTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
 
-  // Hook para actualización en tiempo real
-  const { materials, isConnected } = useMaterialsRealtime({
+  // Hook para actualización en tiempo real de datos
+  const { materials, isConnected: isRealtimeConnected } = useMaterialsRealtime({
     initialMaterials,
     states,
   })
+
+  // Hook para sistema de locks con Presence
+  const {
+    lockMaterial,
+    unlockMaterial,
+    getLocker,
+    isConnected: isPresenceConnected,
+  } = useMaterialLocks(currentUserEmail)
+
+  const isConnected = isRealtimeConnected && isPresenceConnected
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Estás seguro de eliminar este material?')) return
@@ -95,14 +107,20 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                 const state = getStateInfo(material)
                 const hasComments = (material.comments_count || 0) > 0
                 const hasTags = material.tags && material.tags.length > 0
-                const isInProgress = state?.name.toLowerCase() === 'en progreso'
+
+                // Sistema de locks basado en Presence
+                const locker = getLocker(material.id)
+                const isLockedByOther = locker && locker.user_email !== currentUserEmail
+                const isLockedByMe = locker && locker.user_email === currentUserEmail
 
                 return (
                   <tr
                     key={material.id}
                     className={`${
-                      isInProgress
+                      isLockedByOther
                         ? 'bg-blue-50/50 dark:bg-blue-950/20 opacity-60'
+                        : isLockedByMe
+                        ? 'bg-green-50/50 dark:bg-green-950/20'
                         : 'hover:bg-muted/50'
                     }`}
                   >
@@ -139,23 +157,25 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                       <div className="flex items-center justify-end gap-2">
                         {/* Estado con botón de editar análisis */}
                         <button
-                          onClick={() => !isInProgress && setSelectedMaterial(material)}
-                          disabled={isInProgress}
+                          onClick={() => !isLockedByOther && setSelectedMaterial(material)}
+                          disabled={!!isLockedByOther}
                           className={`group flex items-center gap-1.5 transition-opacity ${
-                            isInProgress
+                            isLockedByOther
                               ? 'cursor-not-allowed'
                               : 'hover:opacity-80 cursor-pointer'
                           }`}
-                          title={isInProgress ? 'Material en análisis por otro usuario' : 'Editar análisis'}
+                          title={isLockedByOther ? `En análisis por ${locker?.user_email}` : 'Editar análisis'}
                         >
                           <Badge
                             color={state?.color}
-                            className={isInProgress ? 'cursor-not-allowed' : 'cursor-pointer'}
+                            className={isLockedByOther ? 'cursor-not-allowed' : 'cursor-pointer'}
                           >
                             {state?.name || 'Sin estado'}
                           </Badge>
-                          {isInProgress ? (
-                            <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />
+                          {isLockedByOther ? (
+                            <Lock className="h-3.5 w-3.5 text-blue-500" />
+                          ) : isLockedByMe ? (
+                            <Loader2 className="h-3.5 w-3.5 text-green-500 animate-spin" />
                           ) : (
                             <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                           )}
@@ -166,6 +186,12 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                             </span>
                           )}
                         </button>
+                        {/* Mostrar quién tiene el lock */}
+                        {isLockedByOther && locker && (
+                          <span className="text-xs text-blue-500 max-w-[100px] truncate" title={locker.user_email}>
+                            {locker.user_email.split('@')[0]}
+                          </span>
+                        )}
 
                         {/* Separador */}
                         <span className="h-4 w-px bg-border" />
@@ -214,6 +240,8 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
           tagGroups={tagGroups}
           open={!!selectedMaterial}
           onClose={() => setSelectedMaterial(null)}
+          onLock={lockMaterial}
+          onUnlock={unlockMaterial}
         />
       )}
     </>

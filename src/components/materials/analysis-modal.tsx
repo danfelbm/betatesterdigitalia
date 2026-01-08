@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { submitAnalysis, getAnalysisModalData, setMaterialInProgress, revertMaterialState } from '@/actions/analysis'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -18,10 +18,19 @@ interface AnalysisModalProps {
   tagGroups: TagGroupWithTags[]
   open: boolean
   onClose: () => void
+  onLock: (materialId: string) => void
+  onUnlock: () => void
 }
 
-export function AnalysisModal({ material, states, tagGroups, open, onClose }: AnalysisModalProps) {
-  // Estados locales
+export function AnalysisModal({
+  material,
+  states,
+  tagGroups,
+  open,
+  onClose,
+  onLock,
+  onUnlock,
+}: AnalysisModalProps) {
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [selectedStateId, setSelectedStateId] = useState<string>('')
@@ -29,105 +38,84 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [hasInteracted, setHasInteracted] = useState(false)
+
+  // SIMPLE: guardar el estado anterior aquí
+  const [previousStateId, setPreviousStateId] = useState<string | null>(null)
+  const [materialId, setMaterialId] = useState<string | null>(null)
   const [wasSaved, setWasSaved] = useState(false)
 
-  // Guardar el estado anterior para poder revertir si se cancela
-  const previousStateIdRef = useRef<string | null>(null)
-  // Flag para saber si efectivamente se cambió el estado
-  const stateWasChangedRef = useRef<boolean>(false)
-  // Flag para evitar múltiples inicializaciones del modal
-  const isInitializedRef = useRef<boolean>(false)
-  // Guardar el material.id para detectar cambios reales
-  const currentMaterialIdRef = useRef<string | null>(null)
-
-  // Encontrar estados especiales por nombre
-  const inProgressState = useMemo(() =>
-    states.find(s => s.name.toLowerCase() === 'en progreso'),
+  const inProgressState = useMemo(
+    () => states.find((s) => s.name.toLowerCase() === 'en progreso'),
     [states]
   )
-  const analyzedState = useMemo(() =>
-    states.find(s => s.name.toLowerCase() === 'analizado'),
+  const analyzedState = useMemo(
+    () => states.find((s) => s.name.toLowerCase() === 'analizado'),
     [states]
   )
 
-  const currentVisualState = states.find(s => s.id === selectedStateId)
+  const currentVisualState = states.find((s) => s.id === selectedStateId)
 
-  // Al abrir el modal: cargar datos y cambiar estado a "En progreso"
+  // Inicialización
   useEffect(() => {
-    // Solo inicializar si:
-    // 1. El modal está abierto
-    // 2. No hemos inicializado aún O el material cambió
-    const shouldInitialize = open && (
-      !isInitializedRef.current ||
-      currentMaterialIdRef.current !== material.id
-    )
+    if (!open) return
 
-    if (shouldInitialize) {
-      // Marcar como inicializado ANTES de cualquier otra cosa
-      isInitializedRef.current = true
-      currentMaterialIdRef.current = material.id
+    let cancelled = false
 
+    const init = async () => {
       setIsLoadingData(true)
       setWasSaved(false)
-      stateWasChangedRef.current = false
-      previousStateIdRef.current = null
+      setMaterialId(material.id)
 
-      // Buscar el estado "En progreso" localmente (no depender del useMemo)
-      const inProgressStateLocal = states.find(s => s.name.toLowerCase() === 'en progreso')
+      // Presence lock
+      onLock(material.id)
 
-      // Cargar datos y cambiar estado a "En progreso" en paralelo
-      Promise.all([
-        getAnalysisModalData(material.id),
-        setMaterialInProgress(material.id)
-      ]).then(([dataResult, progressResult]) => {
-        // Verificar que el modal sigue abierto y es el mismo material
-        if (!isInitializedRef.current || currentMaterialIdRef.current !== material.id) {
-          return // El modal se cerró o cambió de material, ignorar
+      // Cambiar a "En progreso"
+      const result = await setMaterialInProgress(material.id)
+
+      if (cancelled) return
+
+      if (!result.error) {
+        setPreviousStateId(result.previousStateId)
+        console.log('✅ Estado anterior guardado:', result.previousStateId)
+      } else {
+        console.error('❌ Error:', result.error)
+      }
+
+      // Cargar datos
+      const data = await getAnalysisModalData(material.id)
+
+      if (cancelled) return
+
+      if (data.data) {
+        setComments(data.data.comments)
+        setSelectedTagIds(new Set(data.data.materialTagIds))
+        if (inProgressState) {
+          setSelectedStateId(inProgressState.id)
         }
+      }
 
-        if (dataResult.data) {
-          setComments(dataResult.data.comments)
-          setSelectedTagIds(new Set(dataResult.data.materialTagIds))
-        }
-
-        // Guardar el estado anterior y marcar que se cambió
-        if (!progressResult.error) {
-          previousStateIdRef.current = progressResult.previousStateId
-          stateWasChangedRef.current = true
-        }
-
-        // Inicializar el selector con "En progreso"
-        if (inProgressStateLocal) {
-          setSelectedStateId(inProgressStateLocal.id)
-        }
-
-        setIsLoadingData(false)
-      })
-
-      // Reset otros estados
-      setNewComment('')
-      setHasInteracted(false)
+      setIsLoadingData(false)
     }
 
-    // Cuando el modal se cierra, resetear el flag de inicialización
-    if (!open) {
-      isInitializedRef.current = false
-      currentMaterialIdRef.current = null
-    }
-  }, [open, material.id, states])
+    init()
 
-  // Cuando el usuario escribe, preseleccionar "Analizado"
+    return () => {
+      cancelled = true
+    }
+  }, [open, material.id, onLock, inProgressState])
+
+  // Auto-seleccionar "Analizado" al escribir
   useEffect(() => {
     if (newComment.trim().length > 0 && !hasInteracted) {
       setHasInteracted(true)
-      // Preseleccionar estado "Analizado" si existe
       if (analyzedState) {
         setSelectedStateId(analyzedState.id)
       }
     }
   }, [newComment, hasInteracted, analyzedState])
 
-  const handleSave = async () => {
+  // GUARDAR
+  async function handleSave() {
     setIsLoading(true)
     setWasSaved(true)
 
@@ -139,24 +127,50 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
 
     setIsLoading(false)
 
-    if (!result.error) {
-      onClose()
+    if (result.error) {
+      setWasSaved(false)
+      alert('Error: ' + result.error)
+      return
     }
+
+    // Limpiar y cerrar
+    onUnlock()
+    resetState()
+    onClose()
   }
 
-  const handleClose = async () => {
+  // CERRAR (cancelar)
+  async function handleClose() {
     if (hasInteracted && newComment.trim().length > 0) {
       if (!confirm('Tienes cambios sin guardar. ¿Descartar?')) {
         return
       }
     }
 
-    // Si no se guardó nada y el estado fue cambiado, revertir al estado anterior
-    if (!wasSaved && stateWasChangedRef.current) {
-      await revertMaterialState(material.id, previousStateIdRef.current)
+    console.log('🔄 Cerrando modal, wasSaved:', wasSaved, 'previousStateId:', previousStateId)
+
+    // Solo revertir si NO se guardó
+    if (!wasSaved && materialId && previousStateId !== undefined) {
+      console.log('🔄 Revirtiendo a:', previousStateId)
+      const result = await revertMaterialState(materialId, previousStateId)
+      console.log('🔄 Resultado revert:', result)
     }
 
+    onUnlock()
+    resetState()
     onClose()
+  }
+
+  function resetState() {
+    setComments([])
+    setNewComment('')
+    setSelectedStateId('')
+    setSelectedTagIds(new Set())
+    setHasInteracted(false)
+    setPreviousStateId(null)
+    setMaterialId(null)
+    setWasSaved(false)
+    setIsLoadingData(true)
   }
 
   return (
@@ -177,7 +191,6 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
           </div>
         ) : (
           <>
-            {/* Historial de comentarios */}
             {comments.length > 0 && (
               <div className="space-y-2">
                 <Label>Historial de análisis</Label>
@@ -185,7 +198,6 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
               </div>
             )}
 
-            {/* Nuevo comentario */}
             <div className="space-y-2">
               <Label htmlFor="comment">Nuevo comentario</Label>
               <Textarea
@@ -195,12 +207,8 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
                 onChange={(e) => setNewComment(e.target.value)}
                 className="min-h-[120px]"
               />
-              <p className="text-xs text-muted-foreground">
-                Registra observaciones, resultados de detección, porcentajes de confianza, etc.
-              </p>
             </div>
 
-            {/* Selector de estado */}
             <div className="space-y-2">
               <Label htmlFor="state">Estado del análisis</Label>
               <Select
@@ -221,18 +229,11 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: currentVisualState.color }}
                   />
-                  <span className="text-muted-foreground">
-                    {currentVisualState.name}
-                  </span>
+                  <span className="text-muted-foreground">{currentVisualState.name}</span>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                El estado se cambió a "En progreso" al abrir este modal.
-                Si cancelas sin guardar, volverá al estado anterior.
-              </p>
             </div>
 
-            {/* Selector de etiquetas */}
             <div className="space-y-2">
               <Label>Etiquetas</Label>
               <TagSelector
@@ -246,15 +247,12 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
       </DialogContent>
 
       <DialogFooter>
-        <Button variant="outline" onClick={handleClose}>
+        <Button variant="outline" onClick={handleClose} disabled={isLoadingData}>
           Cancelar
         </Button>
-        <Button
-          onClick={handleSave}
-          disabled={isLoading || isLoadingData}
-        >
+        <Button onClick={handleSave} disabled={isLoading || isLoadingData}>
           {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Actualizar análisis
+          Guardar
         </Button>
       </DialogFooter>
     </Dialog>

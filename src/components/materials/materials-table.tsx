@@ -114,15 +114,16 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                 const locker = getLocker(material.id)
                 const isLockedByOther = locker && locker.user_email !== currentUserEmail
                 const isLockedByMe = locker && locker.user_email === currentUserEmail
+                const isLocked = !!locker // Cualquier lock (mío o de otro)
 
                 return (
                   <tr
                     key={material.id}
                     className={`${
-                      isLockedByOther
-                        ? 'bg-muted/30 opacity-50 pointer-events-none select-none'
-                        : isLockedByMe
-                        ? 'bg-green-50/50 dark:bg-green-950/20'
+                      isLocked
+                        ? isLockedByMe
+                          ? 'bg-green-100/70 dark:bg-green-950/40 opacity-60 pointer-events-none select-none'
+                          : 'bg-muted/30 opacity-50 pointer-events-none select-none'
                         : 'hover:bg-muted/50'
                     }`}
                   >
@@ -157,18 +158,22 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Indicador de lock cuando está bloqueado por otro */}
-                        {isLockedByOther && locker && (
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <Lock className="h-3.5 w-3.5" />
+                        {/* Indicador de lock */}
+                        {isLocked && locker && (
+                          <div className={`flex items-center gap-1.5 ${isLockedByMe ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            {isLockedByMe ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Lock className="h-3.5 w-3.5" />
+                            )}
                             <span className="text-xs max-w-[120px] truncate" title={locker.user_email}>
-                              {locker.user_email.split('@')[0]}
+                              {isLockedByMe ? 'Tú' : locker.user_email.split('@')[0]}
                             </span>
                           </div>
                         )}
 
-                        {/* Estado con botón de analizar - solo visible si no está bloqueado */}
-                        {!isLockedByOther && (
+                        {/* Estado con botón de analizar - solo visible si NO está bloqueado */}
+                        {!isLocked && (
                           <button
                             onClick={() => handleAnalyze(material.id)}
                             className="group flex items-center gap-1.5 hover:opacity-80 cursor-pointer"
@@ -195,7 +200,7 @@ export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = 
                         )}
 
                         {/* Badge de estado cuando está bloqueado (sin acción) */}
-                        {isLockedByOther && (
+                        {isLocked && (
                           <Badge color={state?.color}>
                             {state?.name || 'Sin estado'}
                           </Badge>

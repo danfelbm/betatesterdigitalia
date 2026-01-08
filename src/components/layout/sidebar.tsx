@@ -10,6 +10,7 @@ import {
   Settings,
   ShieldCheck,
   Tags,
+  Users,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     navigation.push(
       { name: 'Estados', href: '/settings/states', icon: Settings },
       { name: 'Etiquetas', href: '/settings/tags', icon: Tags },
+      { name: 'Usuarios', href: '/settings/users', icon: Users },
     )
   }
 

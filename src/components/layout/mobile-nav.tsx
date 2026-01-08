@@ -10,6 +10,7 @@ import {
   Settings,
   ShieldCheck,
   Tags,
+  Users,
   X,
 } from 'lucide-react'
 
@@ -34,6 +35,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
     navigation.push(
       { name: 'Estados', href: '/settings/states', icon: Settings },
       { name: 'Etiquetas', href: '/settings/tags', icon: Tags },
+      { name: 'Usuarios', href: '/settings/users', icon: Users },
     )
   }
 

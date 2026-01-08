@@ -5,13 +5,11 @@ import { getComments } from '@/actions/comments'
 import { getMaterialTags } from '@/actions/analysis'
 import { getTagGroupsWithTags } from '@/actions/tag-groups'
 import { getAnalysisStates } from '@/actions/analysis-states'
-import { getCurrentUser } from '@/lib/auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CommentHistory } from '@/components/materials/comment-history'
 import { TagChip } from '@/components/ui/tag-chip'
-import { AnalysisButton } from '@/components/materials/analysis-button'
 import { EXPECTED_CATEGORIES, MATERIAL_FORMATS } from '@/lib/constants'
 import {
   ExternalLink,
@@ -23,8 +21,9 @@ import {
   Clock,
   Tag as TagIcon,
   MessageSquare,
+  MousePointerClick,
 } from 'lucide-react'
-import type { TagGroupWithTags, Material } from '@/types/database'
+import type { TagGroupWithTags } from '@/types/database'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -38,7 +37,6 @@ const formatIcons = {
 
 export default async function MaterialShowPage({ params }: PageProps) {
   const { id } = await params
-  const user = await getCurrentUser()
 
   const [materialResult, commentsResult, tagsResult, statesResult, tagGroupsResult] = await Promise.all([
     getMaterialById(id),
@@ -106,12 +104,12 @@ export default async function MaterialShowPage({ params }: PageProps) {
               Abrir URL
             </Button>
           </a>
-          <AnalysisButton
-            material={material as Material}
-            states={states}
-            tagGroups={tagGroups}
-            currentUserEmail={user?.email || ''}
-          />
+          <Link href={`/materials/${id}/analyze`}>
+            <Button variant="outline" size="sm">
+              <MousePointerClick className="h-4 w-4 mr-2" />
+              Analizar
+            </Button>
+          </Link>
         </div>
       </div>
 

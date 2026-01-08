@@ -29,8 +29,8 @@ export function CommentHistory({ comments, maxHeight = '200px', className }: Com
 
   return (
     <div
-      className={cn('space-y-3 overflow-y-auto pr-2', className)}
-      style={{ maxHeight }}
+      className={cn('space-y-3 pr-2', maxHeight !== 'none' && 'overflow-y-auto', className)}
+      style={maxHeight !== 'none' ? { maxHeight } : undefined}
     >
       {comments.map((comment) => (
         <div

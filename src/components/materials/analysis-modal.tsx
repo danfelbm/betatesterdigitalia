@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { submitAnalysis, getAnalysisModalData } from '@/actions/analysis'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { submitAnalysis, getAnalysisModalData, setMaterialInProgress, revertMaterialState } from '@/actions/analysis'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -29,12 +29,12 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [hasInteracted, setHasInteracted] = useState(false)
+  const [wasSaved, setWasSaved] = useState(false)
+
+  // Guardar el estado anterior para poder revertir si se cancela
+  const previousStateIdRef = useRef<string | null>(null)
 
   // Encontrar estados especiales por nombre
-  const pendingState = useMemo(() =>
-    states.find(s => s.name.toLowerCase() === 'pendiente'),
-    [states]
-  )
   const inProgressState = useMemo(() =>
     states.find(s => s.name.toLowerCase() === 'en progreso'),
     [states]
@@ -44,34 +44,42 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
     [states]
   )
 
-  // Estado visual (mostrar "En progreso" mientras está abierto si estaba en Pendiente)
-  const visualStateId = useMemo(() => {
-    if (material.analysis_state_id === pendingState?.id && inProgressState) {
-      return inProgressState.id
-    }
-    return selectedStateId || material.analysis_state_id || ''
-  }, [material.analysis_state_id, pendingState, inProgressState, selectedStateId])
+  const currentVisualState = states.find(s => s.id === selectedStateId)
 
-  const currentVisualState = states.find(s => s.id === visualStateId)
-
-  // Cargar datos del modal
+  // Al abrir el modal: cargar datos y cambiar estado a "En progreso"
   useEffect(() => {
     if (open) {
       setIsLoadingData(true)
-      getAnalysisModalData(material.id).then(result => {
-        if (result.data) {
-          setComments(result.data.comments)
-          setSelectedTagIds(new Set(result.data.materialTagIds))
-          // Inicializar estado seleccionado con el actual del material
-          setSelectedStateId(material.analysis_state_id || '')
+      setWasSaved(false)
+
+      // Cargar datos y cambiar estado a "En progreso" en paralelo
+      Promise.all([
+        getAnalysisModalData(material.id),
+        setMaterialInProgress(material.id)
+      ]).then(([dataResult, progressResult]) => {
+        if (dataResult.data) {
+          setComments(dataResult.data.comments)
+          setSelectedTagIds(new Set(dataResult.data.materialTagIds))
         }
+
+        // Guardar el estado anterior para poder revertir
+        if (progressResult.previousStateId !== undefined) {
+          previousStateIdRef.current = progressResult.previousStateId
+        }
+
+        // Inicializar el selector con "En progreso"
+        if (inProgressState) {
+          setSelectedStateId(inProgressState.id)
+        }
+
         setIsLoadingData(false)
       })
+
       // Reset otros estados
       setNewComment('')
       setHasInteracted(false)
     }
-  }, [open, material.id, material.analysis_state_id])
+  }, [open, material.id, inProgressState])
 
   // Cuando el usuario escribe, preseleccionar "Analizado"
   useEffect(() => {
@@ -86,6 +94,7 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
 
   const handleSave = async () => {
     setIsLoading(true)
+    setWasSaved(true)
 
     const result = await submitAnalysis(material.id, {
       comment: newComment.trim(),
@@ -100,12 +109,18 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
     }
   }
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (hasInteracted && newComment.trim().length > 0) {
       if (!confirm('Tienes cambios sin guardar. ¿Descartar?')) {
         return
       }
     }
+
+    // Si no se guardó nada, revertir al estado anterior
+    if (!wasSaved && previousStateIdRef.current !== null) {
+      await revertMaterialState(material.id, previousStateIdRef.current)
+    }
+
     onClose()
   }
 
@@ -176,11 +191,10 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
                   </span>
                 </div>
               )}
-              {material.analysis_state_id === pendingState?.id && inProgressState && (
-                <p className="text-xs text-blue-500">
-                  Estado visual: En progreso (se actualizará al guardar)
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                El estado se cambió a "En progreso" al abrir este modal.
+                Si cancelas sin guardar, volverá al estado anterior.
+              </p>
             </div>
 
             {/* Selector de etiquetas */}

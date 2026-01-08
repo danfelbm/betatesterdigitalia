@@ -13,6 +13,102 @@ import type {
 } from '@/types/database'
 
 /**
+ * Actualiza el estado del material a "En progreso" al abrir el modal
+ * Retorna el ID del estado anterior para poder revertir si se cancela
+ */
+export async function setMaterialInProgress(
+  materialId: string
+): Promise<{ error: string | null; previousStateId: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'No autenticado', previousStateId: null }
+  }
+
+  // Obtener el material actual y el estado "En progreso"
+  const [materialResult, statesResult] = await Promise.all([
+    supabase
+      .from('materials')
+      .select('id, analysis_state_id')
+      .eq('id', materialId)
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('analysis_states')
+      .select('id, name')
+      .eq('user_id', user.id)
+  ])
+
+  if (materialResult.error || !materialResult.data) {
+    return { error: 'Material no encontrado', previousStateId: null }
+  }
+
+  const inProgressState = statesResult.data?.find(
+    s => s.name.toLowerCase() === 'en progreso'
+  )
+
+  if (!inProgressState) {
+    return { error: 'Estado "En progreso" no encontrado', previousStateId: null }
+  }
+
+  const previousStateId = materialResult.data.analysis_state_id
+
+  // Si ya está en progreso, no hacer nada
+  if (previousStateId === inProgressState.id) {
+    return { error: null, previousStateId }
+  }
+
+  // Actualizar a "En progreso"
+  const { error: updateError } = await supabase
+    .from('materials')
+    .update({
+      analysis_state_id: inProgressState.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', materialId)
+    .eq('user_id', user.id)
+
+  if (updateError) {
+    return { error: updateError.message, previousStateId: null }
+  }
+
+  revalidatePath('/materials')
+  return { error: null, previousStateId }
+}
+
+/**
+ * Revierte el estado del material al estado anterior (si se cancela el modal sin cambios)
+ */
+export async function revertMaterialState(
+  materialId: string,
+  previousStateId: string | null
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'No autenticado' }
+  }
+
+  const { error: updateError } = await supabase
+    .from('materials')
+    .update({
+      analysis_state_id: previousStateId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', materialId)
+    .eq('user_id', user.id)
+
+  if (updateError) {
+    return { error: updateError.message }
+  }
+
+  revalidatePath('/materials')
+  return { error: null }
+}
+
+/**
  * Acción compuesta para submit del modal de análisis
  * Realiza en una sola llamada:
  * 1. Crea el comentario de análisis (si hay contenido)

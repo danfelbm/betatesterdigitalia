@@ -8,7 +8,7 @@ import { AnalysisModal } from './analysis-modal'
 import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Pencil, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick } from 'lucide-react'
+import { ExternalLink, Pencil, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye } from 'lucide-react'
 
 interface MaterialsTableProps {
   materials: Material[]
@@ -125,6 +125,13 @@ export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableP
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/materials/${material.id}/show`}
+                          className="p-2 hover:bg-muted rounded-md"
+                          title="Ver detalles"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
                         <a
                           href={material.url}
                           target="_blank"

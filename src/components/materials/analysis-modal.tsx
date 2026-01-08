@@ -33,6 +33,8 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
 
   // Guardar el estado anterior para poder revertir si se cancela
   const previousStateIdRef = useRef<string | null>(null)
+  // Flag para saber si efectivamente se cambió el estado
+  const stateWasChangedRef = useRef<boolean>(false)
 
   // Encontrar estados especiales por nombre
   const inProgressState = useMemo(() =>
@@ -51,6 +53,7 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
     if (open) {
       setIsLoadingData(true)
       setWasSaved(false)
+      stateWasChangedRef.current = false
 
       // Cargar datos y cambiar estado a "En progreso" en paralelo
       Promise.all([
@@ -62,9 +65,10 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
           setSelectedTagIds(new Set(dataResult.data.materialTagIds))
         }
 
-        // Guardar el estado anterior para poder revertir
-        if (progressResult.previousStateId !== undefined) {
+        // Guardar el estado anterior y marcar que se cambió
+        if (!progressResult.error) {
           previousStateIdRef.current = progressResult.previousStateId
+          stateWasChangedRef.current = true
         }
 
         // Inicializar el selector con "En progreso"
@@ -116,8 +120,8 @@ export function AnalysisModal({ material, states, tagGroups, open, onClose }: An
       }
     }
 
-    // Si no se guardó nada, revertir al estado anterior
-    if (!wasSaved && previousStateIdRef.current !== null) {
+    // Si no se guardó nada y el estado fue cambiado, revertir al estado anterior
+    if (!wasSaved && stateWasChangedRef.current) {
       await revertMaterialState(material.id, previousStateIdRef.current)
     }
 

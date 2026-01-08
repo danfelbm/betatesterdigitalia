@@ -2,21 +2,24 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireAuth, requireAdmin } from '@/lib/auth'
 import type { Tag, TagInsert, TagUpdate } from '@/types/database'
 
 const DEFAULT_TAG_COLOR = '#6B7280'
 
 /**
- * Obtiene etiquetas del usuario, opcionalmente filtradas por grupo
+ * Obtiene etiquetas, opcionalmente filtradas por grupo
  */
 export async function getTags(groupId?: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
+  // Datos compartidos: todos ven todas las etiquetas
   let query = supabase
     .from('tags')
     .select('*, tag_group:tag_groups(id, name, display_order)')
@@ -32,21 +35,20 @@ export async function getTags(groupId?: string) {
     return { error: error.message, data: null }
   }
 
-  // Filtrar solo las etiquetas del usuario (via el grupo)
-  const userTags = data?.filter((tag: any) => tag.tag_group?.user_id === user.id || true) || []
-
-  return { error: null, data: userTags as Tag[] }
+  return { error: null, data: (data || []) as Tag[] }
 }
 
 /**
  * Crea una nueva etiqueta
+ * Solo admin puede crear
  */
 export async function createTag(tag: TagInsert) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   // Validaciones
@@ -62,12 +64,11 @@ export async function createTag(tag: TagInsert) {
     return { error: 'El grupo de la etiqueta es requerido', data: null }
   }
 
-  // Verificar que el grupo pertenece al usuario
+  // Verificar que el grupo existe
   const { data: group } = await supabase
     .from('tag_groups')
     .select('id')
     .eq('id', tag.group_id)
-    .eq('user_id', user.id)
     .single()
 
   if (!group) {
@@ -119,13 +120,15 @@ export async function createTag(tag: TagInsert) {
 
 /**
  * Actualiza una etiqueta existente
+ * Solo admin puede actualizar
  */
 export async function updateTag(id: string, updates: TagUpdate) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   // Validaciones
@@ -150,17 +153,6 @@ export async function updateTag(id: string, updates: TagUpdate) {
     updates.description = updates.description?.trim() || null
   }
 
-  // Verificar que la etiqueta pertenece al usuario (via grupo)
-  const { data: existingTag } = await supabase
-    .from('tags')
-    .select('id, group_id, tag_group:tag_groups(user_id)')
-    .eq('id', id)
-    .single()
-
-  if (!existingTag || (existingTag.tag_group as any)?.user_id !== user.id) {
-    return { error: 'Etiqueta no encontrada', data: null }
-  }
-
   const { data, error } = await supabase
     .from('tags')
     .update(updates)
@@ -182,24 +174,15 @@ export async function updateTag(id: string, updates: TagUpdate) {
 
 /**
  * Elimina una etiqueta
+ * Solo admin puede eliminar
  */
 export async function deleteTag(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado' }
-  }
-
-  // Verificar que la etiqueta pertenece al usuario (via grupo)
-  const { data: existingTag } = await supabase
-    .from('tags')
-    .select('id, tag_group:tag_groups(user_id)')
-    .eq('id', id)
-    .single()
-
-  if (!existingTag || (existingTag.tag_group as any)?.user_id !== user.id) {
-    return { error: 'Etiqueta no encontrada' }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado' }
   }
 
   const { error } = await supabase

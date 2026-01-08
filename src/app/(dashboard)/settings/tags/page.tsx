@@ -1,8 +1,17 @@
+import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/auth'
 import { getTagGroupsWithTags } from '@/actions/tag-groups'
 import { TagsManager } from '@/components/settings/tags-manager'
 import type { TagGroupWithTags } from '@/types/database'
 
 export default async function TagsSettingsPage() {
+  const user = await getCurrentUser()
+
+  // Solo admin puede gestionar etiquetas
+  if (user?.role !== 'admin') {
+    redirect('/dashboard')
+  }
+
   const { data: groups } = await getTagGroupsWithTags()
 
   return (

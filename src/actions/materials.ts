@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireAuth, requireAdmin } from '@/lib/auth'
 import type { MaterialInsert, MaterialUpdate, ExpectedCategory, MaterialFormat, Material, Tag } from '@/types/database'
 
 export async function getMaterials(filters?: {
@@ -12,16 +13,17 @@ export async function getMaterials(filters?: {
   search?: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
+  // Datos compartidos: todos ven todos los materiales
   let query = supabase
     .from('materials')
     .select('*, analysis_state:analysis_states(*)')
-    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
   if (filters?.category) {
@@ -102,18 +104,18 @@ export async function getMaterials(filters?: {
 
 export async function getMaterialById(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
-  // Obtener material con estado
+  // Datos compartidos: todos pueden ver cualquier material
   const { data: material, error } = await supabase
     .from('materials')
     .select('*, analysis_state:analysis_states(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
     .single()
 
   if (error) {
@@ -147,10 +149,12 @@ export async function getMaterialById(id: string) {
 
 export async function createMaterial(material: MaterialInsert) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  let user
+  try {
+    user = await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   // Get default state if no state provided
@@ -159,7 +163,6 @@ export async function createMaterial(material: MaterialInsert) {
     const { data: defaultState } = await supabase
       .from('analysis_states')
       .select('id')
-      .eq('user_id', user.id)
       .eq('is_default', true)
       .single()
 
@@ -187,17 +190,29 @@ export async function createMaterial(material: MaterialInsert) {
 
 export async function updateMaterial(id: string, updates: MaterialUpdate) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  let user
+  try {
+    user = await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
+  }
+
+  // Si no es admin, solo permitir cambiar analysis_state_id
+  if (user.role !== 'admin') {
+    const allowedFields = ['analysis_state_id']
+    const updateKeys = Object.keys(updates)
+    const hasDisallowedFields = updateKeys.some(k => !allowedFields.includes(k))
+
+    if (hasDisallowedFields) {
+      return { error: 'No tienes permisos para editar este material', data: null }
+    }
   }
 
   const { data, error } = await supabase
     .from('materials')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', user.id)
     .select()
     .single()
 
@@ -213,17 +228,17 @@ export async function updateMaterial(id: string, updates: MaterialUpdate) {
 
 export async function deleteMaterial(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado' }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado' }
   }
 
   const { error } = await supabase
     .from('materials')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
 
   if (error) {
     return { error: error.message }
@@ -236,16 +251,17 @@ export async function deleteMaterial(id: string) {
 
 export async function getMaterialStats() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
+  // Datos compartidos: estadísticas de todos los materiales
   const { data: materials, error } = await supabase
     .from('materials')
     .select('id, expected_category, format, analysis_state_id, analysis_state:analysis_states(name, color)')
-    .eq('user_id', user.id)
 
   if (error) {
     return { error: error.message, data: null }

@@ -1,7 +1,16 @@
+import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/auth'
 import { getAnalysisStates } from '@/actions/analysis-states'
 import { StatesManager } from '@/components/settings/states-manager'
 
 export default async function StatesSettingsPage() {
+  const user = await getCurrentUser()
+
+  // Solo admin puede gestionar estados
+  if (user?.role !== 'admin') {
+    redirect('/dashboard')
+  }
+
   const { data: states } = await getAnalysisStates()
 
   return (

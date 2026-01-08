@@ -6,12 +6,15 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Menu, LogOut, User } from 'lucide-react'
 import { MobileNav } from './mobile-nav'
+import { cn } from '@/lib/utils'
+import type { UserRole } from '@/types/database'
 
 interface HeaderProps {
   userEmail?: string
+  userRole: UserRole
 }
 
-export function Header({ userEmail }: HeaderProps) {
+export function Header({ userEmail, userRole }: HeaderProps) {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -44,6 +47,14 @@ export function Header({ userEmail }: HeaderProps) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">{userEmail}</span>
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded font-medium",
+                userRole === 'admin'
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted text-muted-foreground'
+              )}>
+                {userRole === 'admin' ? 'Admin' : 'Usuario'}
+              </span>
             </div>
             <Button
               variant="ghost"
@@ -58,7 +69,11 @@ export function Header({ userEmail }: HeaderProps) {
         </div>
       </div>
 
-      <MobileNav open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+      <MobileNav
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        userRole={userRole}
+      />
     </>
   )
 }

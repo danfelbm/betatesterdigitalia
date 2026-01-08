@@ -2,24 +2,26 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireAuth, requireAdmin } from '@/lib/auth'
 import type { TagGroup, TagGroupInsert, TagGroupUpdate } from '@/types/database'
 
 /**
- * Obtiene todos los grupos de etiquetas del usuario autenticado
+ * Obtiene todos los grupos de etiquetas
  * Ordenados por display_order ascendente
  */
 export async function getTagGroups() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
+  // Datos compartidos: todos ven todos los grupos
   const { data, error } = await supabase
     .from('tag_groups')
     .select('*')
-    .eq('user_id', user.id)
     .order('display_order', { ascending: true })
 
   if (error) {
@@ -34,16 +36,17 @@ export async function getTagGroups() {
  */
 export async function getTagGroupsWithTags() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
+  // Datos compartidos: todos ven todos los grupos
   const { data, error } = await supabase
     .from('tag_groups')
     .select('*, tags(*)')
-    .eq('user_id', user.id)
     .order('display_order', { ascending: true })
 
   if (error) {
@@ -61,14 +64,16 @@ export async function getTagGroupsWithTags() {
 
 /**
  * Crea un nuevo grupo de etiquetas
- * Asigna automáticamente el siguiente display_order
+ * Solo admin puede crear
  */
 export async function createTagGroup(group: TagGroupInsert) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  let user
+  try {
+    user = await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   // Validación
@@ -84,7 +89,6 @@ export async function createTagGroup(group: TagGroupInsert) {
   const { data: maxOrder } = await supabase
     .from('tag_groups')
     .select('display_order')
-    .eq('user_id', user.id)
     .order('display_order', { ascending: false })
     .limit(1)
     .single()
@@ -116,13 +120,15 @@ export async function createTagGroup(group: TagGroupInsert) {
 
 /**
  * Actualiza un grupo de etiquetas existente
+ * Solo admin puede actualizar
  */
 export async function updateTagGroup(id: string, updates: TagGroupUpdate) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   // Validación
@@ -144,7 +150,6 @@ export async function updateTagGroup(id: string, updates: TagGroupUpdate) {
     .from('tag_groups')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', user.id)
     .select()
     .single()
 
@@ -162,20 +167,21 @@ export async function updateTagGroup(id: string, updates: TagGroupUpdate) {
 
 /**
  * Elimina un grupo de etiquetas y todas sus etiquetas asociadas (CASCADE)
+ * Solo admin puede eliminar
  */
 export async function deleteTagGroup(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado' }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado' }
   }
 
   const { error } = await supabase
     .from('tag_groups')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
 
   if (error) {
     return { error: error.message }

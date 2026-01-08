@@ -1,30 +1,41 @@
 'use client'
 
-import { Fragment } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import type { UserRole } from '@/types/database'
 import {
   LayoutDashboard,
   FileStack,
   Settings,
   ShieldCheck,
+  Tags,
   X,
 } from 'lucide-react'
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Materiales', href: '/materials', icon: FileStack },
-  { name: 'Estados', href: '/settings/states', icon: Settings },
-]
 
 interface MobileNavProps {
   open: boolean
   onClose: () => void
+  userRole: UserRole
 }
 
-export function MobileNav({ open, onClose }: MobileNavProps) {
+export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
   const pathname = usePathname()
+  const isAdmin = userRole === 'admin'
+
+  // Items base que todos ven
+  const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Materiales', href: '/materials', icon: FileStack },
+  ]
+
+  // Items solo para admin
+  if (isAdmin) {
+    navigation.push(
+      { name: 'Estados', href: '/settings/states', icon: Settings },
+      { name: 'Etiquetas', href: '/settings/tags', icon: Tags },
+    )
+  }
 
   if (!open) return null
 

@@ -2,20 +2,22 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireAuth, requireAdmin } from '@/lib/auth'
 import type { AnalysisStateInsert, AnalysisStateUpdate } from '@/types/database'
 
 export async function getAnalysisStates() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
+  // Datos compartidos: todos ven todos los estados
   const { data, error } = await supabase
     .from('analysis_states')
     .select('*')
-    .eq('user_id', user.id)
     .order('display_order', { ascending: true })
 
   if (error) {
@@ -27,17 +29,18 @@ export async function getAnalysisStates() {
 
 export async function createAnalysisState(state: AnalysisStateInsert) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  let user
+  try {
+    user = await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   // Get max display_order
   const { data: maxOrder } = await supabase
     .from('analysis_states')
     .select('display_order')
-    .eq('user_id', user.id)
     .order('display_order', { ascending: false })
     .limit(1)
     .single()
@@ -65,17 +68,17 @@ export async function createAnalysisState(state: AnalysisStateInsert) {
 
 export async function updateAnalysisState(id: string, updates: AnalysisStateUpdate) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado', data: null }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado', data: null }
   }
 
   const { data, error } = await supabase
     .from('analysis_states')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', user.id)
     .select()
     .single()
 
@@ -90,10 +93,11 @@ export async function updateAnalysisState(id: string, updates: AnalysisStateUpda
 
 export async function deleteAnalysisState(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado' }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado' }
   }
 
   // Check if it's the default state
@@ -101,7 +105,6 @@ export async function deleteAnalysisState(id: string) {
     .from('analysis_states')
     .select('is_default')
     .eq('id', id)
-    .eq('user_id', user.id)
     .single()
 
   if (state?.is_default) {
@@ -112,7 +115,6 @@ export async function deleteAnalysisState(id: string) {
     .from('analysis_states')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
 
   if (error) {
     return { error: error.message }
@@ -125,24 +127,23 @@ export async function deleteAnalysisState(id: string) {
 
 export async function setDefaultState(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autenticado' }
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado' }
   }
 
   // Remove default from all states
   await supabase
     .from('analysis_states')
     .update({ is_default: false })
-    .eq('user_id', user.id)
 
   // Set new default
   const { error } = await supabase
     .from('analysis_states')
     .update({ is_default: true })
     .eq('id', id)
-    .eq('user_id', user.id)
 
   if (error) {
     return { error: error.message }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/auth'
 import type {
   SubmitAnalysisData,
   SubmitAnalysisResult,
@@ -15,14 +16,16 @@ import type {
 /**
  * Actualiza el estado del material a "En progreso" al abrir el modal
  * Retorna el ID del estado anterior para poder revertir si se cancela
+ * Todos los usuarios autenticados pueden cambiar estados
  */
 export async function setMaterialInProgress(
   materialId: string
 ): Promise<{ error: string | null; previousStateId: string | null }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', previousStateId: null }
   }
 
@@ -32,12 +35,10 @@ export async function setMaterialInProgress(
       .from('materials')
       .select('id, analysis_state_id')
       .eq('id', materialId)
-      .eq('user_id', user.id)
       .single(),
     supabase
       .from('analysis_states')
       .select('id, name')
-      .eq('user_id', user.id)
   ])
 
   if (materialResult.error || !materialResult.data) {
@@ -67,7 +68,6 @@ export async function setMaterialInProgress(
       updated_at: new Date().toISOString(),
     })
     .eq('id', materialId)
-    .eq('user_id', user.id)
 
   if (updateError) {
     return { error: updateError.message, previousStateId: null }
@@ -79,15 +79,17 @@ export async function setMaterialInProgress(
 
 /**
  * Revierte el estado del material al estado anterior (si se cancela el modal sin cambios)
+ * Todos los usuarios autenticados pueden revertir estados
  */
 export async function revertMaterialState(
   materialId: string,
   previousStateId: string | null
 ): Promise<{ error: string | null }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado' }
   }
 
@@ -98,7 +100,6 @@ export async function revertMaterialState(
       updated_at: new Date().toISOString(),
     })
     .eq('id', materialId)
-    .eq('user_id', user.id)
 
   if (updateError) {
     return { error: updateError.message }
@@ -114,15 +115,18 @@ export async function revertMaterialState(
  * 1. Crea el comentario de análisis (si hay contenido)
  * 2. Actualiza el estado del material
  * 3. Actualiza las etiquetas del material
+ * Todos los usuarios autenticados pueden analizar
  */
 export async function submitAnalysis(
   materialId: string,
   data: SubmitAnalysisData
 ): Promise<{ error: string | null; data: SubmitAnalysisResult | null }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  let user
+  try {
+    user = await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
@@ -137,12 +141,11 @@ export async function submitAnalysis(
     return { error: 'El comentario no puede exceder 5000 caracteres', data: null }
   }
 
-  // Verificar que el material pertenece al usuario
+  // Verificar que el material existe (sin filtro de user_id)
   const { data: material, error: materialError } = await supabase
     .from('materials')
-    .select('id, user_id')
+    .select('id')
     .eq('id', materialId)
-    .eq('user_id', user.id)
     .single()
 
   if (materialError || !material) {
@@ -155,7 +158,6 @@ export async function submitAnalysis(
       .from('analysis_states')
       .select('id')
       .eq('id', data.analysis_state_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!state) {
@@ -167,12 +169,10 @@ export async function submitAnalysis(
   if (data.tag_ids.length > 0) {
     const { data: validTags } = await supabase
       .from('tags')
-      .select('id, tag_group:tag_groups(user_id)')
+      .select('id')
       .in('id', data.tag_ids)
 
-    const userTags = validTags?.filter((t: any) => t.tag_group?.user_id === user.id) || []
-
-    if (userTags.length !== data.tag_ids.length) {
+    if (!validTags || validTags.length !== data.tag_ids.length) {
       return { error: 'Una o más etiquetas no son válidas', data: null }
     }
   }
@@ -211,7 +211,6 @@ export async function submitAnalysis(
         updated_at: new Date().toISOString(),
       })
       .eq('id', materialId)
-      .eq('user_id', user.id)
       .select('*, analysis_state:analysis_states(*)')
       .single()
 
@@ -282,13 +281,14 @@ export async function getAnalysisModalData(materialId: string): Promise<{
   } | null
 }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
-  // Ejecutar todas las consultas en paralelo
+  // Ejecutar todas las consultas en paralelo (sin filtros de user_id)
   const [
     materialResult,
     commentsResult,
@@ -302,7 +302,6 @@ export async function getAnalysisModalData(materialId: string): Promise<{
       .from('materials')
       .select('*, analysis_state:analysis_states(*)')
       .eq('id', materialId)
-      .eq('user_id', user.id)
       .single(),
     // Comentarios
     supabase
@@ -315,22 +314,20 @@ export async function getAnalysisModalData(materialId: string): Promise<{
       .from('material_tags')
       .select('tag_id')
       .eq('material_id', materialId),
-    // Grupos de etiquetas
+    // Grupos de etiquetas (compartidos)
     supabase
       .from('tag_groups')
       .select('*')
-      .eq('user_id', user.id)
       .order('display_order', { ascending: true }),
-    // Todas las etiquetas
+    // Todas las etiquetas (compartidas)
     supabase
       .from('tags')
       .select('*')
       .order('display_order', { ascending: true }),
-    // Estados de análisis
+    // Estados de análisis (compartidos)
     supabase
       .from('analysis_states')
       .select('*')
-      .eq('user_id', user.id)
       .order('display_order', { ascending: true })
   ])
 
@@ -364,9 +361,10 @@ export async function getMaterialTags(materialId: string): Promise<{
   data: Tag[] | null
 }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 

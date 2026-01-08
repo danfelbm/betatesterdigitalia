@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/auth'
 import type { Comment, CommentInsert } from '@/types/database'
 
 /**
@@ -11,24 +12,14 @@ import type { Comment, CommentInsert } from '@/types/database'
  */
 export async function getComments(materialId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
-  // Verificar que el material pertenece al usuario
-  const { data: material } = await supabase
-    .from('materials')
-    .select('id')
-    .eq('id', materialId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!material) {
-    return { error: 'Material no encontrado', data: null }
-  }
-
+  // Datos compartidos: todos pueden ver comentarios de cualquier material
   const { data, error } = await supabase
     .from('comments')
     .select('*, analysis_state:analysis_states(id, name, color)')
@@ -45,12 +36,15 @@ export async function getComments(materialId: string) {
 /**
  * Crea un nuevo comentario de análisis
  * Los comentarios son INMUTABLES - no se pueden editar ni eliminar
+ * Todos los usuarios autenticados pueden comentar
  */
 export async function createComment(comment: CommentInsert) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  let user
+  try {
+    user = await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 
@@ -67,25 +61,23 @@ export async function createComment(comment: CommentInsert) {
     return { error: 'El comentario no puede exceder 5000 caracteres', data: null }
   }
 
-  // Verificar que el material pertenece al usuario
+  // Verificar que el material existe (sin filtro de user_id)
   const { data: material } = await supabase
     .from('materials')
     .select('id')
     .eq('id', comment.material_id)
-    .eq('user_id', user.id)
     .single()
 
   if (!material) {
     return { error: 'Material no encontrado', data: null }
   }
 
-  // Si se proporciona analysis_state_id, verificar que existe y pertenece al usuario
+  // Si se proporciona analysis_state_id, verificar que existe
   if (comment.analysis_state_id) {
     const { data: state } = await supabase
       .from('analysis_states')
       .select('id')
       .eq('id', comment.analysis_state_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!state) {
@@ -120,9 +112,10 @@ export async function createComment(comment: CommentInsert) {
  */
 export async function getCommentsCount(materialIds: string[]) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch {
     return { error: 'No autenticado', data: null }
   }
 

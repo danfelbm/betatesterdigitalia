@@ -9,12 +9,13 @@ import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
 import { useMaterialsRealtime } from '@/hooks/use-materials-realtime'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye, Wifi, WifiOff } from 'lucide-react'
+import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye, Wifi, WifiOff, Loader2 } from 'lucide-react'
 
 interface MaterialsTableProps {
   initialMaterials: Material[]
   states: AnalysisState[]
   tagGroups: TagGroupWithTags[]
+  isAdmin?: boolean
 }
 
 const formatIcons = {
@@ -23,7 +24,7 @@ const formatIcons = {
   video: Video,
 }
 
-export function MaterialsTable({ initialMaterials, states, tagGroups }: MaterialsTableProps) {
+export function MaterialsTable({ initialMaterials, states, tagGroups, isAdmin = false }: MaterialsTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
 
@@ -94,9 +95,17 @@ export function MaterialsTable({ initialMaterials, states, tagGroups }: Material
                 const state = getStateInfo(material)
                 const hasComments = (material.comments_count || 0) > 0
                 const hasTags = material.tags && material.tags.length > 0
+                const isInProgress = state?.name.toLowerCase() === 'en progreso'
 
                 return (
-                  <tr key={material.id} className="hover:bg-muted/50">
+                  <tr
+                    key={material.id}
+                    className={`${
+                      isInProgress
+                        ? 'bg-blue-50/50 dark:bg-blue-950/20 opacity-60'
+                        : 'hover:bg-muted/50'
+                    }`}
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <FormatIcon className="h-4 w-4 text-muted-foreground" />
@@ -130,17 +139,26 @@ export function MaterialsTable({ initialMaterials, states, tagGroups }: Material
                       <div className="flex items-center justify-end gap-2">
                         {/* Estado con botón de editar análisis */}
                         <button
-                          onClick={() => setSelectedMaterial(material)}
-                          className="group flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                          title="Editar análisis"
+                          onClick={() => !isInProgress && setSelectedMaterial(material)}
+                          disabled={isInProgress}
+                          className={`group flex items-center gap-1.5 transition-opacity ${
+                            isInProgress
+                              ? 'cursor-not-allowed'
+                              : 'hover:opacity-80 cursor-pointer'
+                          }`}
+                          title={isInProgress ? 'Material en análisis por otro usuario' : 'Editar análisis'}
                         >
                           <Badge
                             color={state?.color}
-                            className="cursor-pointer"
+                            className={isInProgress ? 'cursor-not-allowed' : 'cursor-pointer'}
                           >
                             {state?.name || 'Sin estado'}
                           </Badge>
-                          <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                          {isInProgress ? (
+                            <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />
+                          ) : (
+                            <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                          )}
                           {hasComments && (
                             <span className="flex items-center gap-0.5 text-blue-500" title={`${material.comments_count} comentario(s)`}>
                               <MessageSquare className="h-3 w-3" />
@@ -169,14 +187,16 @@ export function MaterialsTable({ initialMaterials, states, tagGroups }: Material
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
-                        <button
-                          onClick={() => handleDelete(material.id)}
-                          disabled={deletingId === material.id}
-                          className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-md disabled:opacity-50"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(material.id)}
+                            disabled={deletingId === material.id}
+                            className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-md disabled:opacity-50"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

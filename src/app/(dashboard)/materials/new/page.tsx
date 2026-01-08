@@ -1,7 +1,16 @@
+import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/auth'
 import { getAnalysisStates } from '@/actions/analysis-states'
 import { MaterialForm } from '@/components/materials/material-form'
 
 export default async function NewMaterialPage() {
+  const user = await getCurrentUser()
+
+  // Solo admin puede crear materiales
+  if (user?.role !== 'admin') {
+    redirect('/materials')
+  }
+
   const { data: states } = await getAnalysisStates()
 
   return (

@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/auth'
 import { getMaterialById } from '@/actions/materials'
 import { getAnalysisStates } from '@/actions/analysis-states'
 import { MaterialForm } from '@/components/materials/material-form'
@@ -8,6 +9,13 @@ interface PageProps {
 }
 
 export default async function MaterialDetailPage({ params }: PageProps) {
+  const user = await getCurrentUser()
+
+  // Solo admin puede editar materiales
+  if (user?.role !== 'admin') {
+    redirect('/materials')
+  }
+
   const { id } = await params
 
   const [materialResult, statesResult] = await Promise.all([

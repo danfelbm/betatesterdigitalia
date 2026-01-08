@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getMaterials } from '@/actions/materials'
 import { getAnalysisStates } from '@/actions/analysis-states'
 import { getTagGroupsWithTags } from '@/actions/tag-groups'
+import { getCurrentUser } from '@/lib/auth'
 import { MaterialsTable } from '@/components/materials/materials-table'
 import { MaterialsFilters } from '@/components/materials/materials-filters'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,8 @@ interface PageProps {
 
 export default async function MaterialsPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const user = await getCurrentUser()
+  const isAdmin = user?.role === 'admin'
 
   const [materialsResult, statesResult, tagGroupsResult] = await Promise.all([
     getMaterials({
@@ -44,17 +47,24 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
             {materials.length} materiales en el repositorio
           </p>
         </div>
-        <Link href="/materials/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo material
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/materials/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo material
+            </Button>
+          </Link>
+        )}
       </div>
 
       <MaterialsFilters states={states} />
 
-      <MaterialsTable initialMaterials={materials} states={states} tagGroups={tagGroups} />
+      <MaterialsTable
+        initialMaterials={materials}
+        states={states}
+        tagGroups={tagGroups}
+        isAdmin={isAdmin}
+      />
     </div>
   )
 }

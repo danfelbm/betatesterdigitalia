@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import type { UserRole } from '@/types/database'
 import {
   LayoutDashboard,
   FileStack,
@@ -11,15 +12,27 @@ import {
   Tags,
 } from 'lucide-react'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Materiales', href: '/materials', icon: FileStack },
-  { name: 'Estados', href: '/settings/states', icon: Settings },
-  { name: 'Etiquetas', href: '/settings/tags', icon: Tags },
-]
+interface SidebarProps {
+  userRole: UserRole
+}
 
-export function Sidebar() {
+export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
+  const isAdmin = userRole === 'admin'
+
+  // Items base que todos ven
+  const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Materiales', href: '/materials', icon: FileStack },
+  ]
+
+  // Items solo para admin
+  if (isAdmin) {
+    navigation.push(
+      { name: 'Estados', href: '/settings/states', icon: Settings },
+      { name: 'Etiquetas', href: '/settings/tags', icon: Tags },
+    )
+  }
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">

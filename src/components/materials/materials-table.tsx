@@ -8,7 +8,7 @@ import { AnalysisModal } from './analysis-modal'
 import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Pencil, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye } from 'lucide-react'
+import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, MousePointerClick, Eye } from 'lucide-react'
 
 interface MaterialsTableProps {
   materials: Material[]
@@ -57,7 +57,6 @@ export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableP
                 <th className="px-4 py-3 text-left font-medium">Formato</th>
                 <th className="px-4 py-3 text-left font-medium">Fuente</th>
                 <th className="px-4 py-3 text-left font-medium">Categoría</th>
-                <th className="px-4 py-3 text-left font-medium">Estado</th>
                 <th className="px-4 py-3 text-left font-medium">Descripción</th>
                 <th className="px-4 py-3 text-right font-medium">Acciones</th>
               </tr>
@@ -94,26 +93,6 @@ export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableP
                       <Badge color={category?.color}>{category?.label}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelectedMaterial(material)}
-                        className="group flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                      >
-                        <Badge
-                          color={state?.color}
-                          className="cursor-pointer"
-                        >
-                          {state?.name || 'Sin estado'}
-                        </Badge>
-                        <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                        {hasComments && (
-                          <span className="flex items-center gap-0.5 text-blue-500" title={`${material.comments_count} comentario(s)`}>
-                            <MessageSquare className="h-3 w-3" />
-                            <span className="text-[10px]">{material.comments_count}</span>
-                          </span>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
                       <div className="max-w-[200px] space-y-1">
                         <p className="truncate text-muted-foreground">
                           {material.description || '-'}
@@ -124,7 +103,32 @@ export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableP
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Estado con botón de editar análisis */}
+                        <button
+                          onClick={() => setSelectedMaterial(material)}
+                          className="group flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                          title="Editar análisis"
+                        >
+                          <Badge
+                            color={state?.color}
+                            className="cursor-pointer"
+                          >
+                            {state?.name || 'Sin estado'}
+                          </Badge>
+                          <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                          {hasComments && (
+                            <span className="flex items-center gap-0.5 text-blue-500" title={`${material.comments_count} comentario(s)`}>
+                              <MessageSquare className="h-3 w-3" />
+                              <span className="text-[10px]">{material.comments_count}</span>
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Separador */}
+                        <span className="h-4 w-px bg-border" />
+
+                        {/* Otras acciones */}
                         <Link
                           href={`/materials/${material.id}/show`}
                           className="p-2 hover:bg-muted rounded-md"
@@ -141,13 +145,6 @@ export function MaterialsTable({ materials, states, tagGroups }: MaterialsTableP
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
-                        <Link
-                          href={`/materials/${material.id}`}
-                          className="p-2 hover:bg-muted rounded-md"
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Link>
                         <button
                           onClick={() => handleDelete(material.id)}
                           disabled={deletingId === material.id}

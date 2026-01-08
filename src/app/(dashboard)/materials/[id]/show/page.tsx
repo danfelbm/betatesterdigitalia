@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CommentHistory } from '@/components/materials/comment-history'
 import { TagChip } from '@/components/ui/tag-chip'
+import { AnalysisButton } from '@/components/materials/analysis-button'
 import { EXPECTED_CATEGORIES, MATERIAL_FORMATS } from '@/lib/constants'
 import {
   ExternalLink,
-  Pencil,
   ArrowLeft,
   FileText,
   Image,
@@ -23,7 +23,7 @@ import {
   Tag as TagIcon,
   MessageSquare,
 } from 'lucide-react'
-import type { TagGroupWithTags } from '@/types/database'
+import type { TagGroupWithTags, Material } from '@/types/database'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -104,12 +104,11 @@ export default async function MaterialShowPage({ params }: PageProps) {
               Abrir URL
             </Button>
           </a>
-          <Link href={`/materials/${material.id}`}>
-            <Button variant="outline" size="sm">
-              <Pencil className="h-4 w-4 mr-2" />
-              Editar
-            </Button>
-          </Link>
+          <AnalysisButton
+            material={material as Material}
+            states={states}
+            tagGroups={tagGroups}
+          />
         </div>
       </div>
 

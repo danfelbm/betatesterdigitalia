@@ -3,14 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { deleteMaterial } from '@/actions/materials'
+import { deleteMaterial, resetMaterialAnalysis } from '@/actions/materials'
 import { Badge } from '@/components/ui/badge'
 import { TagChips } from '@/components/ui/tag-chip'
 import { EXPECTED_CATEGORIES } from '@/lib/constants'
 import { useMaterialsRealtime } from '@/hooks/use-materials-realtime'
 import { useMaterialLocks } from '@/hooks/use-material-locks'
 import type { Material, AnalysisState, TagGroupWithTags } from '@/types/database'
-import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, Eye, Wifi, WifiOff, Loader2, Lock, Send } from 'lucide-react'
+import { ExternalLink, Trash2, FileText, Image, Video, MessageSquare, Eye, Wifi, WifiOff, Loader2, Lock, Send, RotateCcw } from 'lucide-react'
 
 interface MaterialsTableProps {
   initialMaterials: Material[]
@@ -29,6 +29,7 @@ const formatIcons = {
 export function MaterialsTable({ initialMaterials, states, isAdmin = false, currentUserEmail }: MaterialsTableProps) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [resettingId, setResettingId] = useState<string | null>(null)
 
   // Hook para actualización en tiempo real de datos
   const { materials, isConnected: isRealtimeConnected } = useMaterialsRealtime({
@@ -50,6 +51,17 @@ export function MaterialsTable({ initialMaterials, states, isAdmin = false, curr
     setDeletingId(id)
     await deleteMaterial(id)
     setDeletingId(null)
+  }
+
+  const handleReset = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm('¿Resetear este material? Se cambiará a "Pendiente" y se eliminarán sus etiquetas.')) return
+    setResettingId(id)
+    const result = await resetMaterialAnalysis(id)
+    if (result.error) {
+      alert('Error: ' + result.error)
+    }
+    setResettingId(null)
   }
 
   const handleRowClick = (materialId: string, isLocked: boolean) => {
@@ -216,14 +228,28 @@ export function MaterialsTable({ initialMaterials, states, isAdmin = false, curr
                           <span>Abrir</span>
                         </a>
                         {isAdmin && (
-                          <button
-                            onClick={(e) => handleDelete(e, material.id)}
-                            disabled={deletingId === material.id}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => handleReset(e, material.id)}
+                              disabled={resettingId === material.id}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-amber-500/10 hover:text-amber-600 transition-colors disabled:opacity-50"
+                              title="Resetear análisis (volver a Pendiente)"
+                            >
+                              {resettingId === material.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => handleDelete(e, material.id)}
+                              disabled={deletingId === material.id}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

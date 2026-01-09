@@ -249,6 +249,62 @@ export async function deleteMaterial(id: string) {
   return { error: null }
 }
 
+/**
+ * Resetea el análisis de un material (solo admin)
+ * - Cambia el estado a "Pendiente"
+ * - Elimina todas las etiquetas asignadas
+ * - NO elimina los comentarios (historial)
+ */
+export async function resetMaterialAnalysis(materialId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No autorizado' }
+  }
+
+  // Buscar el estado "Pendiente"
+  const { data: pendingState } = await supabase
+    .from('analysis_states')
+    .select('id')
+    .ilike('name', 'pendiente')
+    .single()
+
+  if (!pendingState) {
+    return { error: 'Estado "Pendiente" no encontrado' }
+  }
+
+  // Actualizar el estado del material a "Pendiente"
+  const { error: updateError } = await supabase
+    .from('materials')
+    .update({
+      analysis_state_id: pendingState.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', materialId)
+
+  if (updateError) {
+    return { error: updateError.message }
+  }
+
+  // Eliminar todas las etiquetas del material
+  const { error: deleteTagsError } = await supabase
+    .from('material_tags')
+    .delete()
+    .eq('material_id', materialId)
+
+  if (deleteTagsError) {
+    return { error: deleteTagsError.message }
+  }
+
+  revalidatePath('/materials')
+  revalidatePath(`/materials/${materialId}`)
+  revalidatePath('/dashboard')
+
+  return { error: null }
+}
+
 export async function getMaterialStats() {
   const supabase = await createClient()
 

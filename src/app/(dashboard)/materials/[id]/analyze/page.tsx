@@ -6,7 +6,7 @@ import { getAnalysisStates } from '@/actions/analysis-states'
 import { getTagGroupsWithTags } from '@/actions/tag-groups'
 import { getCurrentUser } from '@/lib/auth'
 import { AnalysisForm } from '@/components/materials/analysis-form'
-import type { TagGroupWithTags, Material } from '@/types/database'
+import type { TagGroupWithTags, Material, AnalysisState } from '@/types/database'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -39,9 +39,18 @@ export default async function AnalyzeMaterialPage({ params }: PageProps) {
   const states = statesResult.data || []
   const tagGroups = (tagGroupsResult.data || []) as TagGroupWithTags[]
 
-  // Guardar el estado ACTUAL del material para revertir si se cancela
-  // Este es el estado que tenía ANTES de entrar a esta página
-  const previousStateId = material.analysis_state_id
+  // Determinar el estado al que revertir si se cancela
+  // Si el material ya está "En progreso" (por un cleanup fallido anterior),
+  // usar el estado "Pendiente" en su lugar para no quedarse atascado
+  let previousStateId = material.analysis_state_id
+
+  const currentState = material.analysis_state as AnalysisState | null
+  if (currentState?.name?.toLowerCase() === 'en progreso') {
+    const pendingState = states.find(s => s.name.toLowerCase() === 'pendiente')
+    if (pendingState) {
+      previousStateId = pendingState.id
+    }
+  }
 
   return (
     <AnalysisForm

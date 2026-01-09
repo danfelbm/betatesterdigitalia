@@ -213,7 +213,7 @@ export function AnalysisForm({
           {/* 2.2 Comentarios (antes Nuevo Comentario) */}
           <div className="space-y-3">
             <div>
-              <Label htmlFor="comment" className="text-base font-medium">Comentarios</Label>
+              <Label htmlFor="comment" className="text-base font-medium">Comentarios <span className="text-muted-foreground font-normal">(Opcional)</span></Label>
               <p className="text-sm text-muted-foreground mt-1">
                 Escribe aquí si quieres añadir comentarios a tu evaluación
               </p>
@@ -233,7 +233,7 @@ export function AnalysisForm({
           {/* 2.3 Guardar como (antes Estado Final) */}
           <div className="space-y-3">
             <div>
-              <Label htmlFor="state" className="text-base font-medium">Guardar como</Label>
+              <Label htmlFor="state" className="text-base font-medium">Guardar como <span className="text-muted-foreground font-normal">(Opcional)</span></Label>
               <p className="text-sm text-muted-foreground mt-1">
                 Por defecto, tu análisis guardará este Material como &quot;Analizado&quot;, pero si quieres, puedes elegir otro estado final para este Material
               </p>

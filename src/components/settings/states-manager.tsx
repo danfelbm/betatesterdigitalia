@@ -18,6 +18,13 @@ const COLORS = [
   '#FB923C', '#2DD4BF', '#F472B6', '#818CF8', '#4ADE80',
 ]
 
+// Estados del sistema que no se pueden modificar ni eliminar
+const PROTECTED_STATES = ['pendiente', 'en progreso']
+
+const isProtectedState = (stateName: string) => {
+  return PROTECTED_STATES.includes(stateName.toLowerCase())
+}
+
 export function StatesManager({ states }: StatesManagerProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -148,18 +155,15 @@ export function StatesManager({ states }: StatesManagerProps) {
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: state.color }}
                     />
-                    <span className="flex-1 font-medium">{state.name}</span>
-                    {state.is_default && (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                        Por defecto
-                      </span>
-                    )}
+                    <span className={`flex-1 font-medium ${isProtectedState(state.name) ? 'text-muted-foreground' : ''}`}>
+                      {state.name}
+                    </span>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => handleSetDefault(state.id)}
-                      disabled={state.is_default || isLoading}
-                      title="Establecer como defecto"
+                      disabled={state.is_default || isLoading || isProtectedState(state.name)}
+                      title={isProtectedState(state.name) ? 'Estado del sistema' : 'Establecer como defecto'}
                     >
                       <Star className={`h-4 w-4 ${state.is_default ? 'fill-primary text-primary' : ''}`} />
                     </Button>
@@ -167,6 +171,8 @@ export function StatesManager({ states }: StatesManagerProps) {
                       size="icon"
                       variant="ghost"
                       onClick={() => startEdit(state)}
+                      disabled={isProtectedState(state.name)}
+                      title={isProtectedState(state.name) ? 'Estado del sistema - no editable' : 'Editar'}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -174,8 +180,9 @@ export function StatesManager({ states }: StatesManagerProps) {
                       size="icon"
                       variant="ghost"
                       onClick={() => handleDelete(state.id)}
-                      disabled={state.is_default || isLoading}
+                      disabled={state.is_default || isLoading || isProtectedState(state.name)}
                       className="hover:text-destructive"
+                      title={isProtectedState(state.name) ? 'Estado del sistema - no eliminable' : 'Eliminar'}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

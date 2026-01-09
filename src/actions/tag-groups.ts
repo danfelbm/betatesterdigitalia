@@ -102,6 +102,7 @@ export async function createTagGroup(group: TagGroupInsert) {
       description: group.description?.trim() || null,
       user_id: user.id,
       display_order: newOrder,
+      selection_type: group.selection_type || 'single',
     })
     .select()
     .single()
@@ -144,6 +145,12 @@ export async function updateTagGroup(id: string, updates: TagGroupUpdate) {
 
   if (updates.description !== undefined) {
     updates.description = updates.description?.trim() || null
+  }
+
+  if (updates.selection_type !== undefined) {
+    if (!['single', 'multiple'].includes(updates.selection_type)) {
+      return { error: 'Tipo de selección inválido', data: null }
+    }
   }
 
   const { data, error } = await supabase

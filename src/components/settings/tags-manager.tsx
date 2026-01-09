@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { TagGroupWithTags, Tag } from '@/types/database'
+import { Switch } from '@/components/ui/switch'
+import type { TagGroupWithTags, Tag, TagGroupSelectionType } from '@/types/database'
 import { Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface TagsManagerProps {
@@ -30,8 +31,10 @@ export function TagsManager({ groups }: TagsManagerProps) {
   // Form states
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupDescription, setNewGroupDescription] = useState('')
+  const [newGroupSelectionType, setNewGroupSelectionType] = useState<TagGroupSelectionType>('single')
   const [editGroupName, setEditGroupName] = useState('')
   const [editGroupDescription, setEditGroupDescription] = useState('')
+  const [editGroupSelectionType, setEditGroupSelectionType] = useState<TagGroupSelectionType>('single')
 
   const [addingTagToGroupId, setAddingTagToGroupId] = useState<string | null>(null)
   const [newTagName, setNewTagName] = useState('')
@@ -64,6 +67,7 @@ export function TagsManager({ groups }: TagsManagerProps) {
     const result = await createTagGroup({
       name: newGroupName.trim(),
       description: newGroupDescription.trim() || null,
+      selection_type: newGroupSelectionType,
     })
 
     if (result.error) {
@@ -71,6 +75,7 @@ export function TagsManager({ groups }: TagsManagerProps) {
     } else {
       setNewGroupName('')
       setNewGroupDescription('')
+      setNewGroupSelectionType('single')
       setIsAddingGroup(false)
     }
     setIsLoading(false)
@@ -84,6 +89,7 @@ export function TagsManager({ groups }: TagsManagerProps) {
     const result = await updateTagGroup(id, {
       name: editGroupName.trim(),
       description: editGroupDescription.trim() || null,
+      selection_type: editGroupSelectionType,
     })
 
     if (result.error) {
@@ -110,6 +116,7 @@ export function TagsManager({ groups }: TagsManagerProps) {
     setEditingGroupId(group.id)
     setEditGroupName(group.name)
     setEditGroupDescription(group.description || '')
+    setEditGroupSelectionType(group.selection_type || 'multiple')
   }
 
   // Tag handlers
@@ -202,6 +209,23 @@ export function TagsManager({ groups }: TagsManagerProps) {
                     placeholder="Descripción (opcional)"
                     className="h-8"
                   />
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id={`edit-selection-type-${group.id}`}
+                      checked={editGroupSelectionType === 'single'}
+                      onCheckedChange={(checked) =>
+                        setEditGroupSelectionType(checked ? 'single' : 'multiple')
+                      }
+                    />
+                    <Label htmlFor={`edit-selection-type-${group.id}`} className="text-sm cursor-pointer">
+                      Selección única
+                    </Label>
+                    <span className="text-xs text-muted-foreground">
+                      {editGroupSelectionType === 'single'
+                        ? '(obligatorio elegir una)'
+                        : '(puede elegir varias)'}
+                    </span>
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -242,6 +266,13 @@ export function TagsManager({ groups }: TagsManagerProps) {
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground mr-2">
                       {group.tags.length} etiqueta{group.tags.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full mr-2 ${
+                      group.selection_type === 'single'
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {group.selection_type === 'single' ? 'Única' : 'Múltiple'}
                     </span>
                     <Button
                       size="icon"
@@ -455,6 +486,23 @@ export function TagsManager({ groups }: TagsManagerProps) {
                 onChange={(e) => setNewGroupDescription(e.target.value)}
                 placeholder="Breve descripción del grupo"
               />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="new-selection-type"
+                checked={newGroupSelectionType === 'single'}
+                onCheckedChange={(checked) =>
+                  setNewGroupSelectionType(checked ? 'single' : 'multiple')
+                }
+              />
+              <Label htmlFor="new-selection-type" className="text-sm cursor-pointer">
+                Selección única
+              </Label>
+              <span className="text-xs text-muted-foreground">
+                {newGroupSelectionType === 'single'
+                  ? '(obligatorio elegir una)'
+                  : '(puede elegir varias)'}
+              </span>
             </div>
             <div className="flex gap-2">
               <Button onClick={handleAddGroup} disabled={isLoading || !newGroupName.trim()}>

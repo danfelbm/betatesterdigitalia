@@ -38,11 +38,14 @@ export interface AnalysisState {
 // GRUPOS DE ETIQUETAS
 // ============================================
 
+export type TagGroupSelectionType = 'single' | 'multiple'
+
 export interface TagGroup {
   id: string
   name: string
   description: string | null
   display_order: number
+  selection_type: TagGroupSelectionType
   user_id: string
   created_at: string
   // Datos relacionados (JOINs)
@@ -53,12 +56,14 @@ export interface TagGroupInsert {
   name: string
   description?: string | null
   display_order?: number
+  selection_type?: TagGroupSelectionType
 }
 
 export interface TagGroupUpdate {
   name?: string
   description?: string | null
   display_order?: number
+  selection_type?: TagGroupSelectionType
 }
 
 // ============================================

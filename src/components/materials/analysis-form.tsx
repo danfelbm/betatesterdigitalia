@@ -42,6 +42,7 @@ export function AnalysisForm({
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set(materialTagIds))
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [showTagValidation, setShowTagValidation] = useState(false)
 
   // Ref para saber si se guardó (sobrevive renders)
   const wasSavedRef = useRef(false)
@@ -96,7 +97,37 @@ export function AnalysisForm({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Validate that all single-selection groups have a selection
+  function validateSingleGroups(): { isValid: boolean; missingGroups: string[] } {
+    const missingGroups: string[] = []
+
+    for (const group of tagGroups) {
+      if (group.selection_type === 'single' && group.tags.length > 0) {
+        const groupTagIds = new Set(group.tags.map(t => t.id))
+        const hasSelection = Array.from(selectedTagIds).some(id => groupTagIds.has(id))
+
+        if (!hasSelection) {
+          missingGroups.push(group.name)
+        }
+      }
+    }
+
+    return {
+      isValid: missingGroups.length === 0,
+      missingGroups
+    }
+  }
+
   async function handleSave() {
+    // Validate single-selection groups
+    const { isValid, missingGroups } = validateSingleGroups()
+
+    if (!isValid) {
+      setShowTagValidation(true)
+      alert(`Por favor selecciona una opción en: ${missingGroups.join(', ')}`)
+      return
+    }
+
     setIsLoading(true)
     wasSavedRef.current = true
 
@@ -197,13 +228,17 @@ export function AnalysisForm({
             <div>
               <Label className="text-base font-medium">Criterios</Label>
               <p className="text-sm text-muted-foreground mt-1">
-                Selecciona las etiquetas que crees que mejor describen el resultado que obtuviste de Botilito. Puedes seleccionar una o varias.
+                Selecciona las etiquetas que crees que mejor describen el resultado que obtuviste de Botilito. Puedes elegir una opción por grupo.
               </p>
             </div>
             <TagSelector
               groups={tagGroups}
               selectedTagIds={selectedTagIds}
-              onChange={setSelectedTagIds}
+              onChange={(ids) => {
+                setSelectedTagIds(ids)
+                if (showTagValidation) setShowTagValidation(false)
+              }}
+              showValidation={showTagValidation}
             />
           </div>
 

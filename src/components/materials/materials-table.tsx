@@ -191,8 +191,10 @@ export function MaterialsTable({ initialMaterials, states, isAdmin = false, curr
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
-                          title="Analizar y enviar reporte"
+                          onClick={() => handleRowClick(material.id, isLocked)}
+                          disabled={isLocked}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={isLocked ? `Bloqueado por ${locker?.user_email}` : "Analizar y enviar reporte"}
                         >
                           <Send className="h-3.5 w-3.5" />
                           <span>Enviar reporte</span>
